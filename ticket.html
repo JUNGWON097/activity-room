@@ -41,9 +41,17 @@
   .seat-wrap { display: flex; gap: 18px; flex: 1; }
   .seat-map { flex: 1; background: #fff; border-radius: 14px; padding: 16px; text-align: center; }
   .stage-label { background: #3a3d52; color: #fff; border-radius: 8px; padding: 6px; font-size: 13px; font-weight: 700; margin: 0 auto 14px; width: 60%; }
-  .seats { display: inline-grid; grid-template-columns: 18px repeat(8, 22px) 14px repeat(8, 22px); gap: 4px; }
-  .seats .rl { font-size: 11px; color: #8a8ea3; line-height: 22px; font-weight: 700; }
-  .seat { width: 22px; height: 22px; border-radius: 5px 5px 3px 3px; border: 0; padding: 0; cursor: pointer; }
+  .seat-map { overflow-x: auto; }
+  .seats { display: inline-grid; gap: 4px; }
+  .seats .rl { font-size: 11px; color: #8a8ea3; line-height: var(--seat); font-weight: 700; }
+  .seat { width: var(--seat); height: var(--seat); border-radius: 5px 5px 3px 3px; border: 0; padding: 0; cursor: pointer; }
+  .rounds-bar { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+  .rounds-bar span { flex: 1; min-width: 120px; text-align: center; padding: 7px 10px; border-radius: 10px; background: #fff; color: #8a8ea3; font-size: 13px; font-weight: 700; border: 1px solid #e3e5ec; font-variant-numeric: tabular-nums; }
+  .rounds-bar .now { border-color: #6c4dff; color: #6c4dff; background: #f0ecff; }
+  .rounds-bar .ok { color: #1a9e74; }
+  .rounds-bar .bad { color: #e0245e; }
+  .round-tag { display: inline-block; font-size: 12px; font-weight: 800; color: #6c4dff; background: #f0ecff; border-radius: 6px; padding: 2px 8px; margin-bottom: 6px; }
+  .done .tk-btn { margin-top: 14px; }
   .seat.vip { background: #8b6cff; } .seat.r { background: #2fb8a8; } .seat.s { background: #f2a93b; }
   .seat:hover:not(.taken) { outline: 2px solid #1d1f2b; }
   .seat.taken { background: #d9dbe3; cursor: default; }
@@ -98,7 +106,7 @@
         <div class="tk-bar"><span class="logo">🎟 오락실티켓</span><span class="timer" id="timer"></span><span class="clock" id="clock"></span></div>
         <div class="tk-body" id="body"></div>
       </div>
-      <div class="veil" id="veil"><div><div class="t">클릭해서 시작</div><div class="s">곧 8시 정각, 예매가 열려요</div></div></div>
+      <div class="veil" id="veil"><div><div class="t">클릭해서 시작</div><div class="s">대형 아레나 → 중형 홀 → 소극장, 3회차 예매</div></div></div>
     </div>
     <div class="how" id="how"></div>
   </section>

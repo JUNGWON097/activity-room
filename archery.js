@@ -8,15 +8,15 @@ const ctx = setupCanvas(cv, W, H);
 const veil = document.getElementById('veil');
 
 const CX = W / 2, CY = 262, R = 180, RING = R / 10;
-const SHOTS = 6, FULL_DRAW = 650;
-// 발마다 난이도가 오른다: [최대 바람(m/s), 기본 떨림(px), 버틸 때 떨림 증가(px/초), 착지 미리보기]
+const SHOTS = 6, FULL_DRAW = 850;
+// 발마다 난이도가 오른다: 최대 바람(m/s) · 당기는 중 떨림(px) · 다 당긴 뒤 버틸 때 떨림 증가(px/초)
 const LEVELS = [
-  { wind: 1.5, sway: 3, tire: 8, guide: true },
-  { wind: 2.5, sway: 4, tire: 10, guide: true },
-  { wind: 3.5, sway: 5, tire: 12, guide: false },
-  { wind: 4.5, sway: 6, tire: 15, guide: false },
-  { wind: 5.5, sway: 7, tire: 18, guide: false },
-  { wind: 6.5, sway: 8, tire: 22, guide: false },
+  { wind: 3, sway: 6, tire: 22 },
+  { wind: 4, sway: 6, tire: 24 },
+  { wind: 5, sway: 7, tire: 26 },
+  { wind: 6, sway: 7, tire: 28 },
+  { wind: 7, sway: 8, tire: 30 },
+  { wind: 8.5, sway: 9, tire: 34 },
 ];
 const level = () => LEVELS[Math.min(arrows.length, SHOTS - 1)];
 const RING_COLORS = ['#f4f1e8', '#f4f1e8', '#2a2b33', '#2a2b33', '#3a8fd8', '#3a8fd8', '#e8473c', '#e8473c', '#f6cf3a', '#f6cf3a'];
@@ -42,10 +42,10 @@ function power(t) { return holding ? Math.min(1, (t - drawStart) / FULL_DRAW) : 
 function sway(t) {
   const s = t / 1000;
   const lv = level();
-  let amp = lv.sway * 1.6;
+  let amp = lv.sway + 5;
   if (holding) {
-    const over = t - drawStart - FULL_DRAW - 600;              // 다 당긴 뒤 0.6초까지는 흔들림이 늘지 않는다
-    amp = over < 0 ? lv.sway : lv.sway + Math.min(60, over / 1000 * lv.tire);  // 오래 버티면 떨림이 커진다
+    const over = t - drawStart - FULL_DRAW;
+    amp = over < 0 ? lv.sway : lv.sway + Math.min(70, over / 1000 * lv.tire);  // 오래 버티면 떨림이 커진다
   }
   return {
     x: amp * (Math.sin(s * 1.3 + phases[0]) * 0.65 + Math.sin(s * 3.1 + phases[1]) * 0.35),
@@ -54,8 +54,8 @@ function sway(t) {
 }
 // 조준점에 바람과 덜 당김을 더한 착지점
 function landing(x, y, p) {
-  const drift = wind.speed * 6;
-  return { x: x + Math.cos(wind.angle) * drift, y: y + Math.sin(wind.angle) * drift + (1 - p) * 110 };
+  const drift = wind.speed * 7.5;
+  return { x: x + Math.cos(wind.angle) * drift, y: y + Math.sin(wind.angle) * drift + (1 - p) * 150 };
 }
 function gauss() { return (Math.random() + Math.random() + Math.random() - 1.5) / 1.5; }
 function scoreAt(x, y) {
@@ -76,8 +76,8 @@ window.addEventListener('mouseup', () => {
   const p = power(t), sw = sway(t);
   holding = false;
   const hit = landing(mouse.x + sw.x, mouse.y + sw.y, p);
-  const tx = hit.x + gauss() * 2;
-  const ty = hit.y + gauss() * 2;
+  const tx = hit.x + gauss() * 3;
+  const ty = hit.y + gauss() * 3;
   flight = { tx, ty, t0: t };
   phase = 'flying';
 });
@@ -174,7 +174,7 @@ function drawHud(t) {
     ctx.fillStyle = p >= 1 ? '#3fd0c0' : '#ffc83d';
     if (p > 0) { roundRect(bx, by, bw * p, 12, 6); ctx.fill(); }
     ctx.fillStyle = 'rgba(255,255,255,.8)'; ctx.font = '600 13px Pretendard, sans-serif';
-    ctx.fillText(holding ? (p >= 1 ? '지금 놓기!' : '당기는 중…') : '누르고 있으면 당겨요', CX, by - 12);
+    ctx.fillText(holding ? (p >= 1 ? '지금 놓기!' : '당기는 중… 계속 누르고 있기') : '마우스를 꾹 누르고 있으면 활을 당겨요', CX, by - 12);
   }
 }
 function roundRect(x, y, w, h, r) {
@@ -186,19 +186,6 @@ function drawCrosshair(t) {
   const x = mouse.x + sw.x, y = mouse.y + sw.y;
   const p = power(t);
   const r = 18 - p * 8;
-  // 처음 두 발은 화살이 꽂힐 자리를 미리 보여 준다
-  if (level().guide) {
-    const g = landing(x, y, holding ? p : 1);
-    ctx.save();
-    ctx.strokeStyle = 'rgba(63,208,192,.9)'; ctx.fillStyle = 'rgba(63,208,192,.25)';
-    ctx.setLineDash([4, 4]); ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(g.x, g.y); ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.beginPath(); ctx.arc(g.x, g.y, 7, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-    ctx.font = '700 12px Pretendard, sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#3fd0c0';
-    ctx.fillText('여기 꽂혀요', g.x, g.y + 20);
-    ctx.restore();
-  }
   ctx.strokeStyle = holding && p >= 1 ? '#3fd0c0' : '#fff';
   ctx.lineWidth = 2;
   ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.stroke();

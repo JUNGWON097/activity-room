@@ -109,11 +109,25 @@ kbd {
 }
 .stage canvas { display: block; width: 100%; height: auto; }
 .stage.portrait { background: #0e0f18; }
+.stage.cute { background: #fde3ef; border-color: #f6c6dc; }
+.stage.cute .veil { background: rgba(120,80,130,.55); }
+.stage.cute.sky { background: #dff1ff; border-color: #c4e2fb; }
 .stage.portrait canvas { width: auto; max-width: 100%; height: min(74vh, 640px); margin: 0 auto; }
-.how { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 18px; }
-.how h3 { margin: 0 0 4px; font-size: 14px; color: var(--accent); }
+.how { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 20px; }
+.how h3 { margin: 14px 0 6px; font-size: 14px; color: var(--accent); }
+.how h3:first-child { margin-top: 0; }
 .how p { margin: 0; color: #d4d5e0; font-size: 15px; }
 .how b { color: var(--text); }
+.how ul { margin: 0; padding: 0; list-style: none; color: #d4d5e0; font-size: 15px; }
+.how .keys li { display: flex; gap: 10px; align-items: baseline; padding: 3px 0; }
+.how .keys kbd { margin: 0; font-size: 12px; padding: 4px 8px; white-space: nowrap; flex: none; background: var(--panel-2); color: var(--text); }
+.how .tips li { position: relative; padding: 2px 0 2px 16px; }
+.how .tips li::before { content: '•'; position: absolute; left: 2px; color: var(--accent); }
+.veil-keys { list-style: none; margin: 16px auto 0; padding: 12px 16px; display: inline-block; text-align: left;
+  background: rgba(0,0,0,.35); border-radius: 12px; font-size: 14px; color: #e6e7f0; }
+.veil-keys li { padding: 3px 0; }
+.veil-keys kbd { margin: 0 6px 0 0; font-size: 12px; padding: 3px 7px; }
+.ico-svg { width: 1em; height: 1em; display: inline-block; vertical-align: -0.12em; }
 .board-panel {
   background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
   padding: 16px; position: sticky; top: 16px;
