@@ -1,4 +1,4 @@
-import { initGamePage, showResult } from './common.js?v=8';
+import { initGamePage, showResult } from './common.js?v=9';
 
 initGamePage('ticket');
 
@@ -11,9 +11,9 @@ const ROW_NAMES = 'ABCDEFGHIJKLMNOPQRST';
 const GRADE = { vip: { name: 'VIP석', price: 154000 }, r: { name: 'R석', price: 132000 }, s: { name: 'S석', price: 99000 } };
 // 회차마다 공연장이 작아진다. blocks: 한 줄을 통로로 나눈 구역별 좌석 수
 const VENUES = [
-  { name: '대형 아레나', icon: '🏟️', rows: 20, blocks: [12, 14, 12], sell: 26, clash: 1, seat: 11, gap: 2 },
-  { name: '중형 홀', icon: '🎭', rows: 14, blocks: [9, 12, 9], sell: 14, clash: 1.1, seat: 14, gap: 3 },
-  { name: '소극장', icon: '🎪', rows: 10, blocks: [8, 8], sell: 7, clash: 1.2, seat: 18, gap: 3 },
+  { name: '대형 아레나', icon: '🏟️', rows: 20, blocks: [12, 14, 12], sell: 15, clash: 1, seat: 11, gap: 2 },
+  { name: '중형 홀', icon: '🎭', rows: 14, blocks: [9, 12, 9], sell: 9, clash: 1.1, seat: 14, gap: 3 },
+  { name: '소극장', icon: '🎪', rows: 10, blocks: [8, 8], sell: 4.5, clash: 1.2, seat: 18, gap: 3 },
 ];
 // 점수: 앞줄일수록(1000 → 200) · 가운데일수록(+최대 100) · 빨리 끝낼수록(+최대 600, 40초면 0)
 const ROW_MAX = 1000, ROW_MIN = 200, CENTER_MAX = 100, TIME_MAX = 600, TIME_PER_SEC = 15;
@@ -28,7 +28,7 @@ const centerK = s => 1 - Math.abs(s.col - 0.5 - perRow() / 2) / (perRow() / 2); 
 function seatPoints(s) { return Math.round(ROW_MAX - (ROW_MAX - ROW_MIN) * rowK(s) + CENTER_MAX * centerK(s)); }
 function timePoints(secs) { return Math.max(0, Math.round(TIME_MAX - secs * TIME_PER_SEC)); }
 // 다른 사람들은 앞줄 · 가운데부터 채간다
-function demand(s) { return Math.exp(-4.2 * rowK(s)) * (0.55 + 0.45 * centerK(s)); }
+function demand(s) { return Math.exp(-2.6 * rowK(s)) * (0.55 + 0.45 * centerK(s)); }
 function seatLabel(s) { return `${GRADE[s.grade].name} ${ROW_NAMES[s.row]}열 ${s.col}번`; }
 function won(n) { return n.toLocaleString('ko-KR') + '원'; }
 function roundTag() { return `${round + 1}회차 · ${venue.icon} ${venue.name}`; }
@@ -130,7 +130,7 @@ function buildSeats() {
     seats.push({ row: r, col: c, grade: gradeOf(r), taken: false, el: null });
   }
   // 대기 순서가 늦을수록 이미 팔린 좌석이 많다
-  sellRandom(Math.round(seats.length * Math.min(0.5, 0.1 + queueNo / 3000)));
+  sellRandom(Math.round(seats.length * Math.min(0.3, 0.05 + queueNo / 6000)));
 }
 function sellRandom(n) {
   for (let i = 0; i < n; i++) {
