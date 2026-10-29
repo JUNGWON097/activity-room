@@ -11,7 +11,7 @@ const ROWS = 'ABCDEFGHIJ', PER_ROW = 16;
 const GRADE = { vip: { name: 'VIP석', price: 154000, weight: 6, clash: .4 },
                 r: { name: 'R석', price: 132000, weight: 3, clash: .25 },
                 s: { name: 'S석', price: 99000, weight: 1.2, clash: .12 } };
-const SELL_PER_SEC = 9;
+const SELL_PER_SEC = 4.5;
 const CAPTCHA_CHARS = 'ABCDEFGHJKLMNPRSTUVWXYZ';
 
 let openAt, phase, earlyClicks, captchaMiss, clashes, queueNo, seats, mine, checking, simTimer, clockTimer, toastTimer;
@@ -105,7 +105,7 @@ function buildSeats() {
     seats.push({ row: r, col: c, grade: gradeOf(r), taken: false, el: null });
   }
   // 대기 순서가 늦을수록 이미 팔린 좌석이 많다
-  sellRandom(Math.round(seats.length * Math.min(0.55, 0.1 + queueNo / 3200)));
+  sellRandom(Math.round(seats.length * Math.min(0.45, 0.05 + queueNo / 4000)));
 }
 function sellRandom(n) {
   for (let i = 0; i < n; i++) {
@@ -243,6 +243,7 @@ function showCaptcha() {
 function soldOut() {
   clearInterval(simTimer); clearInterval(clockTimer);
   phase = 'soldout';
+  timerEl.textContent = '';
   body.innerHTML = `<div class="done"><div class="big">😭</div><h3>매진되었습니다</h3><p style="color:#50546a">다음 기회에…</p></div>`;
   showResult('ticket', 0, { fail: true, detail: '좌석을 잡기 전에 매진됐어요', onRetry: start });
 }
