@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>티켓팅 체험 · 액티비티룸</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<link rel="stylesheet" href="style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎫</text></svg>">
+<style>
+  /* 가상의 예매 사이트 — 밝은 화면으로 게임판과 구분한다 */
+  .tk { background: #f4f5f8; color: #1d1f2b; min-height: 580px; display: flex; flex-direction: column; }
+  .tk-bar { display: flex; align-items: center; gap: 10px; padding: 12px 18px; background: #fff; border-bottom: 1px solid #e3e5ec; }
+  .tk-bar .logo { font-weight: 900; color: #6c4dff; letter-spacing: -.02em; }
+  .tk-bar .clock { margin-left: auto; font-variant-numeric: tabular-nums; font-weight: 700; color: #50546a; font-size: 14px; }
+  .tk-bar .clock b { color: #1d1f2b; font-size: 16px; }
+  .tk-bar .timer { font-variant-numeric: tabular-nums; font-weight: 800; color: #e0245e; font-size: 14px; }
+  .tk-body { flex: 1; position: relative; padding: 22px; display: flex; flex-direction: column; }
+  .tk-btn { border: 0; border-radius: 10px; padding: 14px 22px; font: inherit; font-weight: 800; font-size: 17px; cursor: pointer; background: #6c4dff; color: #fff; }
+  .tk-btn:hover { filter: brightness(1.08); }
+  .tk-btn.off { background: #c9ccd8; color: #fff; }
+  .tk-btn.ghost { background: #fff; color: #1d1f2b; border: 1px solid #cfd2dc; }
+
+  .poster { display: flex; gap: 22px; align-items: center; background: #fff; border-radius: 14px; padding: 22px; box-shadow: 0 2px 10px rgba(20,20,60,.06); }
+  .poster .art { width: 150px; aspect-ratio: 3/4; border-radius: 10px; flex: none; display: grid; place-items: center; font-size: 56px;
+    background: linear-gradient(135deg, #6c4dff, #ff5c7a 60%, #ffc83d); }
+  .poster h2 { margin: 0 0 6px; font-size: 22px; letter-spacing: -.02em; }
+  .poster dl { margin: 0 0 16px; display: grid; grid-template-columns: 56px 1fr; gap: 3px 8px; font-size: 14px; color: #50546a; }
+  .poster dt { font-weight: 700; color: #1d1f2b; }
+  .poster dd { margin: 0; }
+  .poster .open-at { font-size: 14px; color: #e0245e; font-weight: 700; margin-bottom: 10px; }
+  .toast-in { position: absolute; left: 50%; bottom: 26px; transform: translateX(-50%); background: #1d1f2b; color: #fff; padding: 10px 16px; border-radius: 10px; font-weight: 600; font-size: 14px; white-space: nowrap; }
+
+  .queue { margin: auto; width: min(420px, 100%); background: #fff; border-radius: 16px; padding: 28px; text-align: center; box-shadow: 0 2px 14px rgba(20,20,60,.08); }
+  .queue h3 { margin: 0 0 4px; }
+  .queue .num { font-size: 46px; font-weight: 900; color: #6c4dff; font-variant-numeric: tabular-nums; margin: 10px 0; }
+  .queue .bar { height: 10px; border-radius: 6px; background: #e8e9f0; overflow: hidden; }
+  .queue .bar i { display: block; height: 100%; width: 0; background: #6c4dff; transition: width .1s linear; }
+  .queue p { color: #50546a; font-size: 13px; margin: 12px 0 0; }
+
+  .seat-wrap { display: flex; gap: 18px; flex: 1; }
+  .seat-map { flex: 1; background: #fff; border-radius: 14px; padding: 16px; text-align: center; }
+  .stage-label { background: #3a3d52; color: #fff; border-radius: 8px; padding: 6px; font-size: 13px; font-weight: 700; margin: 0 auto 14px; width: 60%; }
+  .seats { display: inline-grid; grid-template-columns: 18px repeat(8, 22px) 14px repeat(8, 22px); gap: 4px; }
+  .seats .rl { font-size: 11px; color: #8a8ea3; line-height: 22px; font-weight: 700; }
+  .seat { width: 22px; height: 22px; border-radius: 5px 5px 3px 3px; border: 0; padding: 0; cursor: pointer; }
+  .seat.vip { background: #8b6cff; } .seat.r { background: #2fb8a8; } .seat.s { background: #f2a93b; }
+  .seat:hover:not(.taken) { outline: 2px solid #1d1f2b; }
+  .seat.taken { background: #d9dbe3; cursor: default; }
+  .seat.mine { background: #e0245e; outline: 2px solid #1d1f2b; }
+  .seat.checking { animation: blink .3s infinite alternate; }
+  @keyframes blink { to { opacity: .3; } }
+  .legend { display: flex; gap: 12px; justify-content: center; font-size: 12px; color: #50546a; margin-top: 12px; }
+  .legend i { display: inline-block; width: 11px; height: 11px; border-radius: 3px; margin-right: 4px; vertical-align: -1px; }
+  .side { width: 210px; background: #fff; border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 10px; font-size: 14px; }
+  .side h4 { margin: 0; }
+  .side .left-cnt { color: #50546a; }
+  .side .left-cnt div { display: flex; justify-content: space-between; padding: 3px 0; }
+  .side .pick { margin-top: auto; padding: 10px; background: #f4f5f8; border-radius: 10px; min-height: 44px; }
+  .side .tk-btn { width: 100%; font-size: 15px; padding: 12px; }
+
+  .dim { position: absolute; inset: 0; background: rgba(20,22,40,.45); display: grid; place-items: center; z-index: 3; }
+  .box { width: min(360px, 92%); background: #fff; border-radius: 14px; padding: 22px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,.25); }
+  .box h4 { margin: 0 0 4px; font-size: 17px; }
+  .box p { margin: 0 0 12px; color: #50546a; font-size: 13px; }
+  .box canvas { display: block; margin: 0 auto 10px; border-radius: 8px; background: #eef0f6; }
+  .box input { width: 100%; padding: 11px 12px; font: inherit; font-size: 18px; letter-spacing: .2em; text-transform: uppercase; text-align: center;
+    border: 1px solid #cfd2dc; border-radius: 8px; margin-bottom: 10px; }
+  .box .err { color: #e0245e; font-weight: 700; font-size: 13px; min-height: 18px; margin: 0 0 6px; }
+  .box .tk-btn { width: 100%; font-size: 15px; padding: 12px; }
+  .shake { animation: shake .3s; }
+  @keyframes shake { 25% { transform: translateX(-8px); } 75% { transform: translateX(8px); } }
+
+  .pay { margin: auto; width: min(460px, 100%); background: #fff; border-radius: 14px; padding: 22px; display: flex; flex-direction: column; gap: 14px; }
+  .pay h3 { margin: 0; }
+  .pay .sum { background: #f4f5f8; border-radius: 10px; padding: 12px; font-size: 14px; display: grid; grid-template-columns: 70px 1fr; gap: 4px; }
+  .pay .sum b { color: #50546a; font-weight: 600; }
+  .pay .methods { display: flex; gap: 8px; }
+  .pay .methods label { flex: 1; border: 1px solid #cfd2dc; border-radius: 10px; padding: 10px 6px; text-align: center; cursor: pointer; font-size: 14px; font-weight: 600; }
+  .pay .methods input { display: none; }
+  .pay .methods label:has(input:checked) { border-color: #6c4dff; background: #f0ecff; color: #6c4dff; }
+  .pay .agree { font-size: 14px; display: flex; gap: 8px; align-items: center; cursor: pointer; }
+  .pay .agree input { width: 18px; height: 18px; }
+  .pay .err { color: #e0245e; font-weight: 700; font-size: 13px; min-height: 18px; margin: -6px 0; }
+
+  .done { margin: auto; text-align: center; }
+  .done .big { font-size: 64px; }
+  .done h3 { margin: 6px 0; font-size: 24px; }
+  @media (max-width: 700px) { .seat-wrap { flex-direction: column; } .side { width: auto; } .poster { flex-direction: column; } }
+</style>
+</head>
+<body>
+<header class="top" id="top"></header>
+<main class="game-layout">
+  <section class="stage-wrap">
+    <div class="stage" id="stage">
+      <div class="tk">
+        <div class="tk-bar"><span class="logo">🎟 오락실티켓</span><span class="timer" id="timer"></span><span class="clock" id="clock"></span></div>
+        <div class="tk-body" id="body"></div>
+      </div>
+      <div class="veil" id="veil"><div><div class="t">클릭해서 시작</div><div class="s">곧 8시 정각, 예매가 열려요</div></div></div>
+    </div>
+    <div class="how" id="how"></div>
+  </section>
+  <aside class="board-panel"><h2>🏆 랭킹</h2><div id="board"></div></aside>
+</main>
+<script type="module" src="ticket.js"></script>
+</body>
+</html>

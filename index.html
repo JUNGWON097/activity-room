@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>액티비티룸</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<link rel="stylesheet" href="style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🕹️</text></svg>">
+</head>
+<body>
+<header class="top">
+  <h1></h1>
+  <button class="nick-chip" type="button"></button>
+</header>
+<section class="hero">
+  <h1>🕹️ 액티비티<em>룸</em></h1>
+  <p>각자 플레이하고 기록으로 겨루는 미니게임 6종</p>
+</section>
+<main class="grid" id="grid"></main>
+<p class="foot">랭킹에는 게임마다 닉네임별 최고 기록 1개만 남아요. 닉네임은 이 브라우저에 기억돼요.</p>
+
+<script type="module">
+import { GAMES, GAME_IDS, QS, DEV, esc, fmt, topScores, getNick, askNick } from './common.js';
+
+const grid = document.getElementById('grid');
+grid.innerHTML = GAME_IDS.map(id => {
+  const g = GAMES[id];
+  return `<a class="card" href="${id}.html${QS}">
+    <div class="head"><div class="ic">${g.icon}</div>
+      <div><h2>${g.name}</h2><p class="tag">${g.tagline}</p></div></div>
+    <div class="mini" id="mini-${id}"><p class="muted empty">불러오는 중…</p></div>
+    <span class="btn primary play">플레이</span>
+  </a>`;
+}).join('');
+if (DEV) document.querySelector('.hero p').insertAdjacentHTML('beforeend', ' <small class="dev">연습 모드</small>');
+
+function paintChip() {
+  document.querySelector('.nick-chip').textContent = getNick() ? `👤 ${getNick()}` : '👤 닉네임 정하기';
+}
+document.querySelector('.nick-chip').addEventListener('click', () => askNick().then(() => { paintChip(); loadMinis(); }));
+paintChip();
+
+const medal = ['🥇', '🥈', '🥉'];
+function loadMinis() {
+  GAME_IDS.forEach(async id => {
+    const el = document.getElementById('mini-' + id);
+    try {
+      const rows = await topScores(id, 3);
+      el.innerHTML = rows.length
+        ? `<ol class="board">${rows.map((r, i) => `<li class="${r.nick === getNick() ? 'me' : ''}"><span class="rk">${medal[i]}</span><span class="nm">${esc(r.nick)}</span><span class="sc">${fmt(id, r.score)}</span><span></span></li>`).join('')}</ol>`
+        : '<p class="muted empty">아직 기록이 없어요. 첫 1등이 되어 보세요!</p>';
+    } catch (e) {
+      console.error(e);
+      el.innerHTML = '<p class="muted empty">랭킹을 불러오지 못했어요</p>';
+    }
+  });
+}
+loadMinis();
+</script>
+</body>
+</html>

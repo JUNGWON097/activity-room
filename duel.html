@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>석양의 결투 · 액티비티룸</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<link rel="stylesheet" href="style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤠</text></svg>">
+<style>
+  .duel {
+    aspect-ratio: 3 / 2; display: grid; place-items: center; text-align: center; cursor: pointer;
+    background: linear-gradient(#f59e5b 0%, #e2674a 45%, #7a3550 75%, #3a2140 100%);
+    transition: background .05s;
+  }
+  .duel .sun { position: absolute; left: 50%; top: 52%; width: 180px; height: 180px; margin: -90px; border-radius: 50%;
+    background: radial-gradient(#ffe9a8, #ffc45c 60%, rgba(255,196,92,0) 72%); }
+  .duel .ground { position: absolute; left: 0; right: 0; bottom: 0; height: 26%; background: #2a1830; }
+  .duel .cowboy { position: absolute; bottom: 20%; font-size: 64px; }
+  .duel .cowboy.l { left: 12%; } .duel .cowboy.r { right: 12%; transform: scaleX(-1); }
+  .duel .msg { position: relative; z-index: 2; }
+  .duel .msg .t { font-size: clamp(30px, 6vw, 64px); font-weight: 900; color: #fff; text-shadow: 0 4px 0 rgba(0,0,0,.25); }
+  .duel .msg .s { color: rgba(255,255,255,.85); font-weight: 600; margin-top: 4px; }
+  .duel.fire { background: #ff2d4f; }
+  .duel.fire .sun, .duel.fire .ground { opacity: .25; }
+  .duel.fire .t { font-size: clamp(60px, 12vw, 130px); }
+  .duel.foul { background: #4a4d63; }
+  .rounds { position: absolute; top: 14px; left: 0; right: 0; display: flex; gap: 8px; justify-content: center; z-index: 2; }
+  .rounds span { min-width: 74px; padding: 5px 10px; border-radius: 10px; background: rgba(0,0,0,.28); color: #fff; font-weight: 700; font-size: 14px; font-variant-numeric: tabular-nums; }
+  .rounds span.bad { background: rgba(60,60,80,.8); color: #ffb3c0; }
+  .rounds span.now { outline: 2px solid #fff; }
+</style>
+</head>
+<body>
+<header class="top" id="top"></header>
+<main class="game-layout">
+  <section class="stage-wrap">
+    <div class="stage duel" id="duel">
+      <div class="sun"></div><div class="ground"></div>
+      <div class="cowboy l">🤠</div><div class="cowboy r">🤠</div>
+      <div class="rounds" id="rounds"></div>
+      <div class="msg"><div class="t" id="t">클릭해서 시작</div><div class="s" id="s">또는 스페이스 · 5판 평균</div></div>
+    </div>
+    <div class="how" id="how"></div>
+  </section>
+  <aside class="board-panel"><h2>🏆 랭킹</h2><div id="board"></div></aside>
+</main>
+<script type="module" src="duel.js"></script>
+</body>
+</html>
