@@ -7,7 +7,7 @@ const cv = document.getElementById('cv');
 const ctx = setupCanvas(cv, W, H);
 const veil = document.getElementById('veil');
 
-const DURATION = 10000, CPU_RATE = 7.6, PX_PER_TAP = 5, ROPE_Y = 268;
+const DURATION = 10000, CPU_RATE = 6, PX_PER_TAP = 5, ROPE_Y = 268;
 const INK = '#5b4466';
 
 let state = 'ready';          // ready → count → play → done
@@ -39,7 +39,7 @@ function update(now) {
   if (state === 'play') {
     const dt = (now - last) / 1000; last = now;
     // 곰돌이 팀은 일정한 힘에 약간의 출렁임을 섞어 당긴다
-    cpu += dt * (CPU_RATE + Math.sin(now / 420) * 1.6);
+    cpu += dt * (CPU_RATE + Math.sin(now / 420) * 1.2);
     if (now - t0 >= DURATION) finish();
   }
   const target = Math.max(-230, Math.min(230, (cpu - taps) * PX_PER_TAP));
