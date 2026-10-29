@@ -7,7 +7,7 @@ const cv = document.getElementById('cv');
 const ctx = setupCanvas(cv, W, H);
 const veil = document.getElementById('veil');
 
-const DURATION = 10000, CPU_RATE = 7.6, PX_PER_TAP = 5, ROPE_Y = 250;
+const DURATION = 10000, CPU_RATE = 7.6, PX_PER_TAP = 5, ROPE_Y = 268;
 const INK = '#5b4466';
 
 let state = 'ready';          // ready → count → play → done
@@ -152,8 +152,8 @@ function draw(now) {
   ctx.fillStyle = '#ff7fa0'; heart(W / 2 + o, ROPE_Y + 14, 11);
   // 팀
   for (let i = 0; i < 3; i++) {
-    critter(110 + i * 66 + o, ROPE_Y + 40, 'cat', 1, .18 + myEffort * .15 + bump * .05, myEffort, now, i);
-    critter(W - 110 - i * 66 + o, ROPE_Y + 40, 'bear', -1, .2, cpuEffort, now, i);
+    critter(110 + i * 66 + o, ROPE_Y + 34, 'cat', 1, .18 + myEffort * .15 + bump * .05, myEffort, now, i);
+    critter(W - 110 - i * 66 + o, ROPE_Y + 34, 'bear', -1, .2, cpuEffort, now, i);
   }
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.font = '800 15px Pretendard, sans-serif';

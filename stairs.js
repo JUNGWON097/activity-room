@@ -65,7 +65,12 @@ function update(now) {
   } else {
     fallY += 900 * dt * Math.min(3, (now - overAt) / 300 + 0.3);
   }
-  cam.x += (tx - cam.x) * Math.min(1, dt * 8);
+  // 화면은 앞으로 오를 몇 칸의 가운데를 보여 줘서 위쪽 계단이 잘리지 않게 한다
+  ensureSteps(idx + 30);
+  let ahead = 0;
+  for (let i = idx; i < idx + 7; i++) ahead += cols[i];
+  const camX = (tx + ahead / 7 * SHIFT) / 2;
+  cam.x += (camX - cam.x) * Math.min(1, dt * 6);
   cam.y += (ty - cam.y) * Math.min(1, dt * 10);
 }
 

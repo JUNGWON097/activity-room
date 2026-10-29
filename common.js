@@ -55,7 +55,8 @@ export const GAMES = {
       score: '오른 계단 수 · 많을수록 1등',
       tips: ['반짝이는 <b>노란 계단</b>이 다음 칸이에요. 그쪽 방향을 누르세요.', '방향을 틀리면 발을 헛디뎌 떨어져요.', '위쪽 시간 막대는 계속 줄고, 한 칸 오를 때마다 조금 채워져요. 오를수록 빨리 줄어요.'],
     } },
-  ticket: { name: '티켓팅 체험', icon: '🎫', unit: '초', order: 'asc', decimals: 2,
+  // 1회차 방식 기록과 섞이지 않게 3회차 방식은 따로 보관한다
+  ticket: { name: '티켓팅 체험', icon: '🎫', unit: '초', order: 'asc', decimals: 2, store: 'ticket-3r',
     tagline: '큰 공연장부터 소극장까지 3회차 예매',
     how: {
       goal: '3회차 공연을 차례로 예매하세요. 큰 공연장에서 시작해 점점 좌석이 적은 공연장으로 바뀌어요.',
@@ -122,7 +123,7 @@ export async function ensureNick() { return getNick() || askNick(); }
 // 닉네임마다 게임별 최고 기록 1건만 둔다. 판수(plays)는 매번 늘린다.
 export async function saveScore(id, score, extra = {}) {
   const nick = await ensureNick();
-  const ref = doc(db, ROOT, id, 'scores', nick);
+  const ref = doc(db, ROOT, GAMES[id].store || id, 'scores', nick);
   const snap = await getDoc(ref);
   const prev = snap.exists() ? snap.data().score : null;
   const isNew = typeof prev !== 'number' || isBetter(id, score, prev);
@@ -132,7 +133,7 @@ export async function saveScore(id, score, extra = {}) {
   return { nick, isNew, prev, best: isNew ? score : prev };
 }
 export async function topScores(id, n = 20) {
-  const q = query(collection(db, ROOT, id, 'scores'), orderBy('score', GAMES[id].order), limit(n));
+  const q = query(collection(db, ROOT, GAMES[id].store || id, 'scores'), orderBy('score', GAMES[id].order), limit(n));
   const s = await getDocs(q);
   return s.docs.map(d => d.data());
 }

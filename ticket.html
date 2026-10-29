@@ -41,7 +41,8 @@
   .seat-wrap { display: flex; gap: 18px; flex: 1; }
   .seat-map { flex: 1; background: #fff; border-radius: 14px; padding: 16px; text-align: center; }
   .stage-label { background: #3a3d52; color: #fff; border-radius: 8px; padding: 6px; font-size: 13px; font-weight: 700; margin: 0 auto 14px; width: 60%; }
-  .seat-map { overflow-x: auto; }
+  .seat-map { overflow-x: auto; min-width: 0; }
+  .seat-wrap { min-width: 0; }
   .seats { display: inline-grid; gap: 4px; }
   .seats .rl { font-size: 11px; color: #8a8ea3; line-height: var(--seat); font-weight: 700; }
   .seat { width: var(--seat); height: var(--seat); border-radius: 5px 5px 3px 3px; border: 0; padding: 0; cursor: pointer; }
@@ -94,7 +95,7 @@
   .done { margin: auto; text-align: center; }
   .done .big { font-size: 64px; }
   .done h3 { margin: 6px 0; font-size: 24px; }
-  @media (max-width: 700px) { .seat-wrap { flex-direction: column; } .side { width: auto; } .poster { flex-direction: column; } }
+  @media (max-width: 860px) { .seat-wrap { flex-direction: column; } .side { width: auto; } .poster { flex-direction: column; } }
 </style>
 </head>
 <body>

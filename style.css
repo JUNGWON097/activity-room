@@ -111,6 +111,7 @@ kbd {
 .stage.portrait { background: #0e0f18; }
 .stage.cute { background: #fde3ef; border-color: #f6c6dc; }
 .stage.cute .veil { background: rgba(120,80,130,.55); }
+.veil .s { color: rgba(255,255,255,.88); font-weight: 600; }
 .stage.cute.sky { background: #dff1ff; border-color: #c4e2fb; }
 .stage.portrait canvas { width: auto; max-width: 100%; height: min(74vh, 640px); margin: 0 auto; }
 .how { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 20px; }
