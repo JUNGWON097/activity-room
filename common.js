@@ -55,7 +55,7 @@ function shortDate(ms) { const d = new Date(ms); return `${d.getMonth() + 1}/${d
 const NICK_KEY = 'activity-room:nick';
 export function getNick() { try { return localStorage.getItem(NICK_KEY) || ''; } catch { return ''; } }
 function storeNick(n) { try { localStorage.setItem(NICK_KEY, n); } catch { } }
-function cleanNick(s) { return String(s || '').replace(/[\/\\.#$\[\]]/g, '').replace(/\s+/g, ' ').trim().slice(0, 10); }
+function cleanNick(s) { return String(s || '').replace(/[\/\\.#$\[\]]/g, '').replace(/\s+/g, ' ').trim().slice(0, 20); }
 function paintNickChips() {
   document.querySelectorAll('.nick-chip').forEach(b => { b.textContent = getNick() ? `👤 ${getNick()}` : '👤 닉네임 정하기'; });
 }
@@ -65,8 +65,8 @@ export function askNick() {
     ov.className = 'overlay';
     ov.innerHTML = `<form class="modal">
       <h2>닉네임</h2>
-      <p class="muted">랭킹에 이 이름으로 기록돼요. 10자 이내.</p>
-      <input name="nick" maxlength="10" autocomplete="off" placeholder="예: 정원" value="${esc(getNick())}">
+      <p class="muted">랭킹에 이 이름으로 기록돼요. 20자 이내.</p>
+      <input name="nick" maxlength="20" autocomplete="off" placeholder="예: 정원" value="${esc(getNick())}">
       <p class="err" hidden>한 글자 이상 입력해 주세요</p>
       <div class="row"><button class="btn primary" type="submit">확인</button></div>
     </form>`;
