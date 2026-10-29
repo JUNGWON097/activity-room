@@ -1,4 +1,4 @@
-import { initGamePage, showResult } from './common.js';
+import { initGamePage, showResult } from './common.js?v=8';
 
 initGamePage('ticket');
 
@@ -7,22 +7,28 @@ const clockEl = document.getElementById('clock');
 const timerEl = document.getElementById('timer');
 const veil = document.getElementById('veil');
 
-const ROW_NAMES = 'ABCDEFGHIJKL';
-const GRADE = { vip: { name: 'VIP석', price: 154000, weight: 6, clash: .45 },
-                r: { name: 'R석', price: 132000, weight: 3, clash: .28 },
-                s: { name: 'S석', price: 99000, weight: 1.2, clash: .14 } };
-// 회차마다 공연장이 작아진다: 좌석이 적을수록 빨리 매진되고 더 자주 뺏긴다
+const ROW_NAMES = 'ABCDEFGHIJKLMNOPQRST';
+const GRADE = { vip: { name: 'VIP석', price: 154000 }, r: { name: 'R석', price: 132000 }, s: { name: 'S석', price: 99000 } };
+// 회차마다 공연장이 작아진다. blocks: 한 줄을 통로로 나눈 구역별 좌석 수
 const VENUES = [
-  { name: '대형 아레나', icon: '🏟️', rows: 12, perRow: 20, vipRows: 2, rRows: 5, sell: 7, clash: 1, seat: 18 },
-  { name: '중형 홀', icon: '🎭', rows: 9, perRow: 16, vipRows: 2, rRows: 3, sell: 5, clash: 1.15, seat: 22 },
-  { name: '소극장', icon: '🎪', rows: 6, perRow: 10, vipRows: 1, rRows: 2, sell: 3.2, clash: 1.3, seat: 26 },
+  { name: '대형 아레나', icon: '🏟️', rows: 20, blocks: [12, 14, 12], sell: 26, clash: 1, seat: 11, gap: 2 },
+  { name: '중형 홀', icon: '🎭', rows: 14, blocks: [9, 12, 9], sell: 14, clash: 1.1, seat: 14, gap: 3 },
+  { name: '소극장', icon: '🎪', rows: 10, blocks: [8, 8], sell: 7, clash: 1.2, seat: 18, gap: 3 },
 ];
-const SOLD_OUT_SECS = 40;
+// 점수: 앞줄일수록(1000 → 200) · 가운데일수록(+최대 100) · 빨리 끝낼수록(+최대 600, 40초면 0)
+const ROW_MAX = 1000, ROW_MIN = 200, CENTER_MAX = 100, TIME_MAX = 600, TIME_PER_SEC = 15;
 const CAPTCHA_CHARS = 'ABCDEFGHJKLMNPRSTUVWXYZ';
 
 let round, results, venue, openAt, phase, earlyClicks, captchaMiss, clashes, queueNo, seats, mine, checking, simTimer, clockTimer, toastTimer;
 
-function gradeOf(r) { return r < venue.vipRows ? 'vip' : r < venue.vipRows + venue.rRows ? 'r' : 's'; }
+const perRow = () => venue.blocks.reduce((a, b) => a + b, 0);
+function gradeOf(r) { const k = r / venue.rows; return k < .2 ? 'vip' : k < .55 ? 'r' : 's'; }
+const rowK = s => s.row / (venue.rows - 1);                                   // 0 = 맨 앞줄, 1 = 맨 뒷줄
+const centerK = s => 1 - Math.abs(s.col - 0.5 - perRow() / 2) / (perRow() / 2); // 1 = 정가운데
+function seatPoints(s) { return Math.round(ROW_MAX - (ROW_MAX - ROW_MIN) * rowK(s) + CENTER_MAX * centerK(s)); }
+function timePoints(secs) { return Math.max(0, Math.round(TIME_MAX - secs * TIME_PER_SEC)); }
+// 다른 사람들은 앞줄 · 가운데부터 채간다
+function demand(s) { return Math.exp(-4.2 * rowK(s)) * (0.55 + 0.45 * centerK(s)); }
 function seatLabel(s) { return `${GRADE[s.grade].name} ${ROW_NAMES[s.row]}열 ${s.col}번`; }
 function won(n) { return n.toLocaleString('ko-KR') + '원'; }
 function roundTag() { return `${round + 1}회차 · ${venue.icon} ${venue.name}`; }
@@ -64,13 +70,13 @@ function roundsBar() {
   return `<div class="rounds-bar">${VENUES.map((v, i) => {
     const r = results[i];
     const cls = i === round && phase !== 'between' ? 'now' : r ? (r.soldOut ? 'bad' : 'ok') : '';
-    return `<span class="${cls}">${v.icon} ${i + 1}회차 ${r ? (r.soldOut ? '매진' : r.secs.toFixed(2) + '초') : v.name}</span>`;
+    return `<span class="${cls}">${v.icon} ${i + 1}회차 ${r ? (r.soldOut ? '매진 0점' : r.points.toLocaleString('ko-KR') + '점') : v.name}</span>`;
   }).join('')}</div>`;
 }
 
 /* ---------- 1. 오픈 대기 ---------- */
 function screenOpen() {
-  const total = venue.rows * venue.perRow;
+  const total = venue.rows * perRow();
   body.innerHTML = `${roundsBar()}<div class="poster">
     <div class="art">${venue.icon}</div>
     <div>
@@ -120,18 +126,18 @@ function screenQueue() {
 /* ---------- 3. 좌석 + 보안문자 ---------- */
 function buildSeats() {
   seats = [];
-  for (let r = 0; r < venue.rows; r++) for (let c = 1; c <= venue.perRow; c++) {
+  for (let r = 0; r < venue.rows; r++) for (let c = 1; c <= perRow(); c++) {
     seats.push({ row: r, col: c, grade: gradeOf(r), taken: false, el: null });
   }
   // 대기 순서가 늦을수록 이미 팔린 좌석이 많다
-  sellRandom(Math.round(seats.length * Math.min(0.45, 0.06 + queueNo / 3800)));
+  sellRandom(Math.round(seats.length * Math.min(0.5, 0.1 + queueNo / 3000)));
 }
 function sellRandom(n) {
   for (let i = 0; i < n; i++) {
-    const pool = seats.filter(s => !s.taken && s !== mine);
+    const pool = seats.filter(s => !s.taken && s !== mine && s !== checking);
     if (!pool.length) return;
-    let pick = Math.random() * pool.reduce((a, s) => a + GRADE[s.grade].weight, 0);
-    const s = pool.find(x => (pick -= GRADE[x.grade].weight) <= 0) || pool[pool.length - 1];
+    let pick = Math.random() * pool.reduce((a, s) => a + demand(s), 0);
+    const s = pool.find(x => (pick -= demand(x)) <= 0) || pool[pool.length - 1];
     s.taken = true;
     if (s.el) s.el.className = 'seat taken';
   }
@@ -139,11 +145,10 @@ function sellRandom(n) {
 function screenSeats() {
   phase = 'seats';
   buildSeats();
-  const half = venue.perRow / 2;
   body.innerHTML = `${roundsBar()}<div class="seat-wrap">
     <div class="seat-map">
       <div class="stage-label">STAGE</div>
-      <div class="seats" id="seats" style="--seat:${venue.seat}px;grid-template-columns:18px repeat(${half},var(--seat)) 12px repeat(${half},var(--seat))"></div>
+      <div class="seats" id="seats" style="--seat:${venue.seat}px;gap:${venue.gap}px;grid-template-columns:16px ${venue.blocks.map(n => `repeat(${n},var(--seat))`).join(' 8px ')}"></div>
       <div class="legend"><span><i style="background:#8b6cff"></i>VIP</span><span><i style="background:#2fb8a8"></i>R</span><span><i style="background:#f2a93b"></i>S</span><span><i style="background:#d9dbe3"></i>판매 완료</span></div>
     </div>
     <div class="side">
@@ -156,14 +161,16 @@ function screenSeats() {
   const grid = body.querySelector('#seats');
   for (let r = 0; r < venue.rows; r++) {
     grid.insertAdjacentHTML('beforeend', `<span class="rl">${ROW_NAMES[r]}</span>`);
-    for (let c = 1; c <= venue.perRow; c++) {
-      const s = seats[r * venue.perRow + c - 1];
+    let edge = 0;
+    const aisles = venue.blocks.slice(0, -1).map(n => (edge += n));   // 이 번호 뒤에 통로
+    for (let c = 1; c <= perRow(); c++) {
+      const s = seats[r * perRow() + c - 1];
       const b = document.createElement('button');
       b.className = 'seat ' + (s.taken ? 'taken' : s.grade);
       b.title = seatLabel(s);
       b.addEventListener('click', () => clickSeat(s));
       s.el = b; grid.appendChild(b);
-      if (c === half) grid.appendChild(document.createElement('span'));
+      if (aisles.includes(c)) grid.appendChild(document.createElement('span'));
     }
   }
   body.querySelector('#next').addEventListener('click', () => {
@@ -196,7 +203,8 @@ function clickSeat(s) {
     checking = null;
     if (phase !== 'seats') return;
     s.el.classList.remove('checking');
-    if (s.taken || Math.random() < GRADE[s.grade].clash * venue.clash) {
+    // 앞줄 · 가운데 좌석일수록 다른 사람과 겹칠 확률이 높다
+    if (s.taken || Math.random() < (0.08 + 0.45 * demand(s)) * venue.clash) {
       // 확인하는 사이 다른 사람이 먼저 결제 단계로 넘어갔다
       s.taken = true; s.el.className = 'seat taken'; clashes++;
       paintLeft();
@@ -208,7 +216,9 @@ function clickSeat(s) {
   }, 300 + Math.random() * 300);
 }
 function paintPick() {
-  body.querySelector('#pick').innerHTML = mine ? `<b>${seatLabel(mine)}</b><br>${won(GRADE[mine.grade].price)}` : '좌석을 선택해 주세요';
+  body.querySelector('#pick').innerHTML = mine
+    ? `<b>${seatLabel(mine)}</b><br>${won(GRADE[mine.grade].price)}<br><span class="pts">좌석 점수 ${seatPoints(mine).toLocaleString('ko-KR')}점</span>`
+    : '좌석을 선택해 주세요<br><span class="pts">앞줄 · 가운데일수록 점수가 높아요</span>';
   body.querySelector('#next').classList.toggle('off', !mine);
 }
 function dialog(title, msg) {
@@ -288,13 +298,15 @@ function screenPay() {
     const err = f.querySelector('.err');
     if (!f.m.value) { err.textContent = '결제 수단을 선택해 주세요'; return; }
     if (!f.agree.checked) { err.textContent = '취소 규정에 동의해 주세요'; return; }
-    endRound({ secs: Math.round((performance.now() - openAt) / 10) / 100, seat: seatLabel(mine), grade: mine.grade });
+    const secs = Math.round((performance.now() - openAt) / 10) / 100;
+    const seatPts = seatPoints(mine), timePts = timePoints(secs);
+    endRound({ secs, seat: seatLabel(mine), grade: mine.grade, seatPts, timePts, points: seatPts + timePts });
   });
 }
 
 /* ---------- 회차 끝 · 매진 ---------- */
 function soldOut() {
-  endRound({ secs: SOLD_OUT_SECS, soldOut: true });
+  endRound({ soldOut: true, points: 0 });
 }
 function endRound(r) {
   clearInterval(simTimer); clearInterval(clockTimer);
@@ -305,22 +317,23 @@ function endRound(r) {
   body.innerHTML = `${roundsBar()}<div class="done">
     <div class="big">${r.soldOut ? '😭' : '🎉'}</div>
     <h3>${r.soldOut ? '매진되었습니다' : '예매 완료!'}</h3>
-    <p style="color:#50546a">${r.soldOut ? `이 회차는 ${SOLD_OUT_SECS}초로 기록돼요` : `${r.seat} · ${r.secs.toFixed(2)}초`}</p>
+    ${r.soldOut ? `<p style="color:#50546a">이 회차는 0점이에요</p>` : `<p style="color:#50546a">${r.seat} · ${r.secs.toFixed(2)}초</p>
+    <div class="score-break"><span>좌석 ${r.seatPts.toLocaleString('ko-KR')}점</span><span>+</span><span>속도 ${r.timePts.toLocaleString('ko-KR')}점</span><span>=</span><b>${r.points.toLocaleString('ko-KR')}점</b></div>`}
     ${last ? '' : `<button class="tk-btn" id="nextRound">다음 회차: ${VENUES[round + 1].icon} ${VENUES[round + 1].name} →</button>`}
   </div>`;
   if (last) return finish();
   body.querySelector('#nextRound').addEventListener('click', () => { round++; beginRound(); });
 }
 function finish() {
-  const total = Math.round(results.reduce((a, r) => a + r.secs, 0) * 100) / 100;
-  const per = results.map((r, i) => `${i + 1}회차 ${r.soldOut ? '매진' : r.secs.toFixed(2) + '초'}`).join(' · ');
+  const total = results.reduce((a, r) => a + r.points, 0);
+  const per = results.map((r, i) => `${i + 1}회차 ${r.soldOut ? '매진' : `${r.seat.replace(/^\S+ /, '')} ${r.points.toLocaleString('ko-KR')}점`}`).join(' · ');
   const notes = [];
   if (earlyClicks) notes.push(`오픈 전 클릭 ${earlyClicks}회`);
   if (clashes) notes.push(`좌석 뺏김 ${clashes}회`);
   if (captchaMiss) notes.push(`보안문자 틀림 ${captchaMiss}회`);
   showResult('ticket', total, {
     detail: per + (notes.length ? `<br><small>${notes.join(' · ')}</small>` : ''),
-    extra: { rounds: results.map(r => r.soldOut ? null : r.secs), seats: results.map(r => r.seat || null), earlyClicks, clashes, captchaMiss },
+    extra: { points: results.map(r => r.points), secs: results.map(r => r.soldOut ? null : r.secs), seats: results.map(r => r.seat || null), earlyClicks, clashes, captchaMiss },
     onRetry: start,
   });
 }

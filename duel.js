@@ -1,4 +1,4 @@
-import { initGamePage, showResult } from './common.js';
+import { initGamePage, showResult } from './common.js?v=8';
 
 initGamePage('duel');
 

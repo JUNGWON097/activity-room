@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>티켓팅 체험 · 액티비티룸</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=8">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎫</text></svg>">
 <style>
   /* 가상의 예매 사이트 — 밝은 화면으로 게임판과 구분한다 */
@@ -45,7 +45,10 @@
   .seat-wrap { min-width: 0; }
   .seats { display: inline-grid; gap: 4px; }
   .seats .rl { font-size: 11px; color: #8a8ea3; line-height: var(--seat); font-weight: 700; }
-  .seat { width: var(--seat); height: var(--seat); border-radius: 5px 5px 3px 3px; border: 0; padding: 0; cursor: pointer; }
+  .seat { width: var(--seat); height: var(--seat); border-radius: 35% 35% 20% 20%; border: 0; padding: 0; cursor: pointer; }
+  .side .pts { color: #6c4dff; font-weight: 700; font-size: 13px; }
+  .score-break { display: inline-flex; gap: 8px; align-items: center; background: #fff; border-radius: 10px; padding: 8px 14px; font-size: 14px; color: #50546a; }
+  .score-break b { color: #6c4dff; font-size: 17px; }
   .rounds-bar { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
   .rounds-bar span { flex: 1; min-width: 120px; text-align: center; padding: 7px 10px; border-radius: 10px; background: #fff; color: #8a8ea3; font-size: 13px; font-weight: 700; border: 1px solid #e3e5ec; font-variant-numeric: tabular-nums; }
   .rounds-bar .now { border-color: #6c4dff; color: #6c4dff; background: #f0ecff; }
@@ -113,6 +116,6 @@
   </section>
   <aside class="board-panel"><h2>🏆 랭킹</h2><div id="board"></div></aside>
 </main>
-<script type="module" src="ticket.js"></script>
+<script type="module" src="ticket.js?v=8"></script>
 </body>
 </html>

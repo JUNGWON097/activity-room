@@ -1,4 +1,4 @@
-import { initGamePage, showResult, setupCanvas, canvasPoint } from './common.js';
+import { initGamePage, showResult, setupCanvas, canvasPoint } from './common.js?v=8';
 
 initGamePage('stairs');
 
