@@ -187,7 +187,8 @@ function paintLeft() {
     `<div><span>${GRADE[g].name}</span><b>${seats.filter(s => s.grade === g && !s.taken && s !== mine).length}석</b></div>`).join('');
 }
 function clickSeat(s) {
-  if (phase !== 'seats' || s.taken || s === mine || checking || body.querySelector('.dim')) return;
+  if (phase !== 'seats' || s === mine || checking || body.querySelector('.dim')) return;
+  if (s.taken) { dialog('이미 선택된 좌석입니다', '다른 고객님이 먼저 선택한 좌석이에요. 다른 좌석을 선택해 주세요.'); return; }
   if (mine) { mine.el.className = 'seat ' + mine.grade; mine = null; paintPick(); }
   checking = s;
   s.el.classList.add('checking');
