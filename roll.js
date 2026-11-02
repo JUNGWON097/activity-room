@@ -1,4 +1,4 @@
-import { initGamePage, showResult, setupCanvas, canvasPoint } from './common.js?v=9';
+import { initGamePage, showResult, setupCanvas, canvasPoint } from './common.js?v=10';
 
 initGamePage('roll');
 

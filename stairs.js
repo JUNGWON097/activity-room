@@ -1,4 +1,4 @@
-import { initGamePage, showResult, setupCanvas, canvasPoint } from './common.js?v=9';
+import { initGamePage, showResult, setupCanvas, canvasPoint } from './common.js?v=10';
 
 initGamePage('stairs');
 
@@ -30,7 +30,8 @@ function start() {
   cam = { x: 0, y: 0 }; pos = { x: 0, y: 0 };
   state = 'play'; veil.hidden = true;
 }
-function drainRate() { return Math.min(75, 15 + idx * 0.2); }
+// 시간 막대가 닳는 속도(초당). 버티려면 초당 (닳는 속도 ÷ 한 칸 회복량) 칸을 올라야 한다
+function drainRate() { return Math.min(45, 12 + idx * 0.08); }
 
 function step(dir) {
   if (state !== 'play') return;
@@ -38,7 +39,7 @@ function step(dir) {
   facing = dir;
   if (cols[idx + 1] - cols[idx] !== dir) { pos.x += dir * SHIFT * 0.6; return over('fall'); }
   idx++; hopAt = performance.now();
-  gauge = Math.min(100, gauge + 7);
+  gauge = Math.min(100, gauge + 8);
 }
 function over(reason) {
   state = 'over'; overAt = performance.now(); overReason = reason;
