@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>불 꺼진 학교 · 액티비티룸</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<link rel="stylesheet" href="style.css?v=15">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>👻</text></svg>">
+</head>
+<body>
+<header class="top" id="top"></header>
+<main class="game-layout">
+  <section class="stage-wrap">
+    <div class="stage" id="stage" style="background:#05050a">
+      <canvas id="cv"></canvas>
+      <div class="veil" id="veil"><div><div class="t">👻 클릭하거나 스페이스로 시작</div><div class="s">열쇠 3개를 찾아 비상구로. 유령은 빛을 받으면 멈춰요.<br>⚠️ 갑자기 놀라는 장면과 소리가 있어요 (M으로 소리 끄기)</div></div></div>
+    </div>
+    <div class="how" id="how"></div>
+  </section>
+  <aside class="board-panel"><h2>🏆 랭킹</h2><div id="board"></div></aside>
+</main>
+<script type="module" src="horror.js?v=15"></script>
+</body>
+</html>
