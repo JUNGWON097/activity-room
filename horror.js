@@ -1,4 +1,4 @@
-import { initGamePage, showResult, setupCanvas, canvasPoint } from './common.js?v=16';
+import { initGamePage, showResult, setupCanvas, canvasPoint } from './common.js?v=17';
 
 initGamePage('horror');
 
@@ -18,6 +18,9 @@ const P_SPEED = 135, G_SPEED = 92, P_R = 11, BEAM_R = 270, BEAM_A = .43, AMB_R =
 
 let state = 'ready';   // ready → play → caught → done
 let map, player, ghosts, keysLeft, got, batteries, exit, battery, lightOn, t0, now0, last, aim, mouseAt, scareAt, pathT, distP, msg, msgAt, flick;
+// 숨기: 사물함 안에서는 숨(breath)이 줄고, 다 떨어지면 저절로 나온다
+const BREATH_DRAIN = 20, BREATH_GAIN = 9, BREATH_MIN = 35, WANDER_AFTER = 2600;
+let lockers, hidden, breath, wanderUntil, lightBefore;
 const keys = {};
 
 /* ---------- 지도 ---------- */
@@ -66,6 +69,7 @@ function clearLine(ax, ay, bx, by) {
   return true;
 }
 
+const newGhost = (tx, ty) => ({ ...center(tx, ty), tgt: null, lit: false, wander: null, saw: false });
 function start() {
   map = genMap();
   const d = bfs(map, 1, 1);
@@ -82,10 +86,19 @@ function start() {
     if (keysLeft.length === 3) break;
   }
   batteries = open.filter(([, , dd]) => dd > 6).sort(() => Math.random() - .5).slice(0, 7).map(([x, y]) => ({ tx: x, ty: y }));
+  // 사물함: 열쇠 · 건전지 · 비상구와 겹치지 않게, 서로 떨어뜨려 배치
+  const taken = new Set([...keysLeft, ...batteries, exit].map(o => o.tx + ',' + o.ty));
+  lockers = [];
+  for (const [x, y] of open.filter(([, , dd]) => dd > 3).sort(() => Math.random() - .5)) {
+    if (taken.has(x + ',' + y)) continue;
+    if (lockers.every(l => Math.abs(l.tx - x) + Math.abs(l.ty - y) > 6)) lockers.push({ tx: x, ty: y });
+    if (lockers.length === 10) break;
+  }
   const gs = open.filter(([, , dd]) => dd > maxD * .5).sort(() => Math.random() - .5)[0] || far;
-  ghosts = [{ ...center(gs[0], gs[1]), tgt: null, lit: false }];
+  ghosts = [newGhost(gs[0], gs[1])];
   player = { ...center(1, 1) };
   got = 0; battery = 100; lightOn = true; aim = 0; mouseAt = 0; scareAt = 0; pathT = 0; distP = null; flick = 1;
+  hidden = null; breath = 100; wanderUntil = 0; lightBefore = true;
   msg = '열쇠 3개를 찾아 비상구로 탈출하세요'; msgAt = performance.now();
   t0 = performance.now(); last = t0;
   state = 'play'; veil.hidden = true;
@@ -158,20 +171,24 @@ function update(now) {
   let mx = 0, my = 0;
   if (keys.KeyA || keys.ArrowLeft) mx--; if (keys.KeyD || keys.ArrowRight) mx++;
   if (keys.KeyW || keys.ArrowUp) my--; if (keys.KeyS || keys.ArrowDown) my++;
-  if (mx || my) {
+  if ((mx || my) && !hidden) {
     const l = Math.hypot(mx, my);
     move(player, mx / l * P_SPEED * dt, my / l * P_SPEED * dt, P_R);
     if (now - mouseAt > 1500) aim = Math.atan2(my, mx);
   }
   // 배터리
   if (lightOn && battery > 0) { battery = Math.max(0, battery - dt * 1.6); if (battery === 0) say('손전등이 꺼졌어요… 건전지를 찾으세요'); }
+  // 숨: 숨어 있으면 줄고, 다 떨어지면 저절로 튀어나온다
+  if (hidden) {
+    breath = Math.max(0, breath - BREATH_DRAIN * dt);
+    if (breath === 0) { unhide(now); say('💨 숨이 막혀서 뛰쳐나왔어요!'); }
+  } else breath = Math.min(100, breath + BREATH_GAIN * dt);
   // 줍기
   const [ptx, pty] = tileOf(player);
   for (const k of keysLeft) if (!k.got && k.tx === ptx && k.ty === pty) {
     k.got = true; got++; blip(880, .25, 'triangle', .15);
     if (got === 2) {
-      const sp = center(exit.tx, exit.ty);
-      ghosts.push({ ...sp, tgt: null, lit: false });
+      ghosts.push(newGhost(exit.tx, exit.ty));
       say('🔑 2개… 어디선가 무언가 깨어났어요');
     } else say(got === 3 ? '🔑 3개 다 모았어요! 초록 불빛의 비상구로!' : `🔑 열쇠 ${got}/3`);
   }
@@ -180,27 +197,54 @@ function update(now) {
   // 유령 길찾기: 주기적으로 플레이어까지의 거리표를 새로 만든다
   if (now - pathT > 250 || !distP) { distP = bfs(map, ptx, pty); pathT = now; }
   let nearest = 1e9;
+  const lost = hidden || now < wanderUntil;   // 숨어 있거나 막 나온 참이면 유령은 나를 놓친다
   for (const g of ghosts) {
     const d = Math.hypot(g.x - player.x, g.y - player.y);
     nearest = Math.min(nearest, d);
     g.lit = isLit(g.x, g.y);
-    if (d < 24) return caught(now);
+    // 숨는 걸 들킨 유령은 사물함까지 와서 끌어낸다
+    if (d < 24 && (!hidden || g.saw)) return caught(now);
     if (g.lit) continue;
-    // 바로 보이면 곧장, 아니면 길을 따라
-    if (d < 70 && clearLine(g.x, g.y, player.x, player.y)) {
-      const l = d || 1; move(g, (player.x - g.x) / l * G_SPEED * dt, (player.y - g.y) / l * G_SPEED * dt, 8); continue;
+    const speed = G_SPEED * (1 + got * .06);
+    let field = distP;
+    if (lost && !g.saw) {
+      // 나와 먼 곳으로 떠돈다: 목적지까지의 거리표를 따라 내려간다
+      const [gtx, gty] = tileOf(g);
+      if (!g.wander || (gtx === g.wander.tx && gty === g.wander.ty)) {
+        // 유령에게는 가깝고 나에게서는 먼 곳 = 나를 지나치지 않고 반대쪽으로 가는 곳
+        // (나와의 거리 - 유령과의 거리)가 지금 나와의 거리와 비슷하면, 가는 길 내내 나에게서 멀어진다
+        const fromG = bfs(map, gtx, gty), dpG = Math.max(0, distP[gty]?.[gtx] ?? 0), cand = [], loose = [];
+        for (let y = 1; y < ROWS - 1; y++) for (let x = 1; x < COLS - 1; x++) {
+          const dp = distP[y][x], dg = fromG[y][x];
+          if (dp < 0 || dg < 4) continue;
+          if (dp - dg >= dpG - 2 && dg >= 6) cand.push([x, y, dg]);
+          else if (dp > 8 && dg < dp - 4) loose.push([x, y, dp - dg]);
+        }
+        cand.sort((a, b) => b[2] - a[2]); loose.sort((a, b) => b[2] - a[2]);
+        const pool = cand.length ? cand.slice(0, 6) : loose.slice(0, 6);
+        const [wx, wy] = pool[rnd(pool.length)] || [gtx, gty];
+        g.wander = { tx: wx, ty: wy, field: bfs(map, wx, wy) };
+        g.tgt = null;
+      }
+      field = g.wander.field;
+    } else {
+      if (g.wander) { g.wander = null; g.tgt = null; }
+      // 바로 보이면 곧장 다가온다
+      if (d < 70 && clearLine(g.x, g.y, player.x, player.y)) {
+        const l = d || 1; move(g, (player.x - g.x) / l * speed * dt, (player.y - g.y) / l * speed * dt, 8); continue;
+      }
     }
     const [gtx, gty] = tileOf(g);
     if (!g.tgt || (Math.abs(g.x - g.tgt.x) < 3 && Math.abs(g.y - g.tgt.y) < 3)) {
-      let best = null, bd = distP[gty]?.[gtx] ?? 999;
+      let best = null, bd = field[gty]?.[gtx] ?? 999;
       for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-        const v = distP[gty + dy]?.[gtx + dx];
+        const v = field[gty + dy]?.[gtx + dx];
         if (v >= 0 && v < bd) { bd = v; best = [gtx + dx, gty + dy]; }
       }
       g.tgt = best ? center(best[0], best[1]) : center(gtx, gty);
     }
     const dx = g.tgt.x - g.x, dy = g.tgt.y - g.y, l = Math.hypot(dx, dy) || 1;
-    const sp = Math.min(l, G_SPEED * (1 + got * .06) * dt);
+    const sp = Math.min(l, (lost && !g.saw ? speed * .8 : speed) * dt);
     g.x += dx / l * sp; g.y += dy / l * sp;
   }
   // 긴장감: 가까울수록 심장 소리 빨라지고 손전등이 떨린다
@@ -212,6 +256,36 @@ function update(now) {
     if (t > nextBeat) { const gap = 1.1 - near * .75; thump(t, .25 + near * .35); thump(t + .16, .18 + near * .25); nextBeat = t + gap; }
   }
 }
+/* ---------- 숨기 ---------- */
+function nearLocker() {
+  return lockers.find(l => Math.hypot(l.tx * T + T / 2 - player.x, l.ty * T + T / 2 - player.y) < T * .9);
+}
+function hide(now) {
+  const l = nearLocker();
+  if (!l) return;
+  if (breath < BREATH_MIN) { say('💨 숨이 차서 아직 못 숨어요'); return; }
+  hidden = l;
+  const c = center(l.tx, l.ty); player.x = c.x; player.y = c.y;
+  lightBefore = lightOn; lightOn = false;
+  distP = null;   // 유령이 떠날 방향을 지금 내 위치 기준으로 다시 계산
+  // 가까이서 보고 있던 유령은 속지 않는다
+  let seen = 0;
+  for (const g of ghosts) {
+    g.saw = Math.hypot(g.x - player.x, g.y - player.y) < 120 && clearLine(g.x, g.y, player.x, player.y) && !g.lit;
+    if (g.saw) seen++;
+    g.wander = null; g.tgt = null;
+  }
+  blip(180, .18, 'square', .08);
+  say(seen ? '😱 들켰어요! 유령이 보고 있었어요' : '🤫 숨었어요… 숨이 다 떨어지기 전에 나가세요');
+}
+function unhide(now) {
+  if (!hidden) return;
+  hidden = null; lightOn = lightBefore;
+  wanderUntil = now + WANDER_AFTER;
+  for (const g of ghosts) g.saw = false;
+  blip(220, .15, 'square', .08);
+}
+
 function win(now) {
   state = 'done';
   droneLevel(0);
@@ -273,7 +347,18 @@ function drawWorld(now, cx, cy) {
   for (const k of keysLeft) if (!k.got) ctx.fillText('🔑', k.tx * T - cx + T / 2, k.ty * T - cy + T / 2 + Math.sin(now / 300) * 2);
   ctx.font = '18px "Segoe UI Emoji", sans-serif';
   for (const b of batteries) if (!b.got) ctx.fillText('🔋', b.tx * T - cx + T / 2, b.ty * T - cy + T / 2);
+  // 사물함
+  for (const l of lockers) {
+    const lx = l.tx * T - cx, ly = l.ty * T - cy;
+    if (lx < -T || ly < -T || lx > VW || ly > VH) continue;
+    ctx.fillStyle = '#20262b'; ctx.fillRect(lx + 7, ly + 6, T - 14, T - 4);
+    ctx.fillStyle = hidden === l ? '#3c4a55' : '#4a5a66'; ctx.fillRect(lx + 9, ly + 3, T - 18, T - 6);
+    ctx.fillStyle = '#2a333a';
+    for (let i = 0; i < 3; i++) ctx.fillRect(lx + 13, ly + 8 + i * 4, T - 26, 1.6);
+    ctx.fillStyle = '#c9b27a'; ctx.fillRect(lx + T - 15, ly + 20, 2.5, 6);
+  }
   for (const g of ghosts) ghostShape(g.x - cx, g.y - cy, 1.35, now, g.lit ? .6 + Math.random() * .4 : .95);
+  if (hidden) return;
   // 나
   const px = player.x - cx, py = player.y - cy;
   ctx.fillStyle = '#ffd9b8'; ctx.beginPath(); ctx.arc(px, py, P_R, 0, Math.PI * 2); ctx.fill();
@@ -339,6 +424,21 @@ function drawHUD(now, cx, cy) {
   ctx.fillStyle = '#333'; ctx.fillRect(118, 13, 110, 14);
   ctx.fillStyle = battery < 20 ? '#ff5c5c' : '#9be37a'; ctx.fillRect(120, 15, 106 * battery / 100, 10);
   ctx.fillStyle = lightOn ? '#ccc' : '#ff8a8a'; ctx.font = '700 12px Pretendard, sans-serif'; ctx.fillText(lightOn ? `${Math.round(battery)}%` : '꺼짐', 236, 20);
+  // 숨 게이지
+  ctx.font = '800 15px Pretendard, sans-serif'; ctx.fillStyle = '#ccc'; ctx.fillText('💨', 290, 20);
+  ctx.fillStyle = '#333'; ctx.fillRect(314, 13, 90, 14);
+  ctx.fillStyle = breath < BREATH_MIN ? '#ff8a5c' : '#8fd3ff'; ctx.fillRect(316, 15, 86 * breath / 100, 10);
+  // 사물함 앞이면 안내
+  const nl = !hidden && nearLocker();
+  if (nl) {
+    const lx = nl.tx * T - cx + T / 2, ly = nl.ty * T - cy - 10;
+    const txt = breath < BREATH_MIN ? '💨 숨 고르는 중…' : 'E  숨기';
+    ctx.textAlign = 'center'; ctx.font = '800 13px Pretendard, sans-serif';
+    const w = ctx.measureText(txt).width + 16;
+    ctx.fillStyle = 'rgba(0,0,0,.7)'; ctx.fillRect(lx - w / 2, ly - 11, w, 22);
+    ctx.fillStyle = breath < BREATH_MIN ? '#ff9a7a' : '#ffe9a8'; ctx.fillText(txt, lx, ly);
+    ctx.textAlign = 'left';
+  }
   ctx.textAlign = 'right'; ctx.font = '800 16px Pretendard, sans-serif'; ctx.fillStyle = '#ddd';
   const tNow = state === 'play' ? now : (scareAt || now);
   ctx.fillText(`${Math.max(0, (tNow - t0) / 1000).toFixed(1)}초`, VW - 16, 20);
@@ -394,7 +494,28 @@ function draw(now) {
   const cx = Math.max(0, Math.min(WW - VW, player.x - VW / 2)), cy = Math.max(-44, Math.min(WH - VH, player.y - VH / 2));
   drawWorld(now, cx, cy);
   drawDark(cx, cy);
+  if (hidden) drawHidden(now);
   drawHUD(now, cx, cy);
+}
+// 사물함 안: 문틈 사이로만 밖이 보인다
+function drawHidden(now) {
+  const slits = [VH / 2 - 34, VH / 2 - 6, VH / 2 + 22], sh = 12;
+  ctx.fillStyle = '#07080a';
+  let y = 0;
+  for (const s of slits) { ctx.fillRect(0, y, VW, s - y); y = s + sh; }
+  ctx.fillRect(0, y, VW, VH - y);
+  ctx.fillStyle = '#151a1e';
+  for (const s of slits) { ctx.fillRect(0, s - 3, VW, 3); ctx.fillRect(0, s + sh, VW, 3); }
+  // 숨소리처럼 화면이 살짝 어두워졌다 밝아진다
+  const k = breath / 100;
+  ctx.fillStyle = `rgba(0,0,0,${.15 + .1 * Math.sin(now / (200 + 400 * k))})`; ctx.fillRect(0, 0, VW, VH);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.font = '800 16px Pretendard, sans-serif'; ctx.fillStyle = '#c9c2b8';
+  ctx.fillText('사물함 안에 숨어 있어요 · E로 나가기', VW / 2, VH / 2 + 86);
+  ctx.fillStyle = '#222'; ctx.fillRect(VW / 2 - 120, VH / 2 + 106, 240, 12);
+  ctx.fillStyle = k < .3 ? '#ff6a5c' : '#8fd3ff'; ctx.fillRect(VW / 2 - 118, VH / 2 + 108, 236 * k, 8);
+  ctx.font = '700 12px Pretendard, sans-serif'; ctx.fillStyle = '#8a857e';
+  ctx.fillText(`숨 ${Math.ceil(breath / BREATH_DRAIN)}초 남음`, VW / 2, VH / 2 + 132);
 }
 function frame(now) { update(now); draw(now); requestAnimationFrame(frame); }
 requestAnimationFrame(frame);
@@ -405,7 +526,8 @@ document.addEventListener('keydown', e => {
   if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Space'].includes(e.code)) e.preventDefault();
   if (e.code === 'KeyM') { muted = !muted; droneLevel(0); return; }
   if (state === 'ready' && e.code === 'Space') return start();
-  if (state === 'play' && e.code === 'Space' && !e.repeat) { lightOn = !lightOn; blip(lightOn ? 1200 : 700, .05, 'square', .05); }
+  if (state === 'play' && e.code === 'Space' && !e.repeat && !hidden) { lightOn = !lightOn; blip(lightOn ? 1200 : 700, .05, 'square', .05); }
+  if (state === 'play' && (e.code === 'KeyE' || e.code === 'KeyF') && !e.repeat) { if (hidden) unhide(performance.now()); else hide(performance.now()); }
   keys[e.code] = true;
 });
 document.addEventListener('keyup', e => { keys[e.code] = false; });
