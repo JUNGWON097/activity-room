@@ -1,4 +1,4 @@
-import { initGamePage, showResult, setupCanvas, canvasPoint } from './common.js?v=17';
+import { initGamePage, showResult, setupCanvas, canvasPoint } from './common.js?v=18';
 
 initGamePage('horror');
 
@@ -14,7 +14,8 @@ dark.width = VW * dpr; dark.height = VH * dpr;
 const dctx = dark.getContext('2d');
 dctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-const P_SPEED = 135, G_SPEED = 92, P_R = 11, BEAM_R = 270, BEAM_A = .43, AMB_R = 64;
+const P_SPEED = 140, G_SPEED = 92, P_R = 10, BEAM_R = 310, BEAM_A = .55, AMB_R = 120;
+let seen;   // 한 번 본 칸은 어둡게라도 계속 보인다
 
 let state = 'ready';   // ready → play → caught → done
 let map, player, ghosts, keysLeft, got, batteries, exit, battery, lightOn, t0, now0, last, aim, mouseAt, scareAt, pathT, distP, msg, msgAt, flick;
@@ -37,12 +38,19 @@ function genMap() {
     g[y + dy / 2][x + dx / 2] = 0; g[ny][nx] = 0; st.push([nx, ny]);
   }
   // 길이 하나뿐이면 도망칠 곳이 없으니 벽을 조금 뚫어 고리를 만든다
-  for (let i = 0; i < 70; i++) {
+  for (let i = 0, n = 0; i < 400 && n < 60; i++) {
     const x = 1 + rnd(COLS - 2), y = 1 + rnd(ROWS - 2);
-    if (g[y][x] === 1 && ((g[y][x - 1] === 0 && g[y][x + 1] === 0) || (g[y - 1][x] === 0 && g[y + 1][x] === 0))) g[y][x] = 0;
+    if (g[y][x] === 1 && ((g[y][x - 1] === 0 && g[y][x + 1] === 0) || (g[y - 1][x] === 0 && g[y + 1][x] === 0))) { g[y][x] = 0; n++; }
+  }
+  // 막다른 길은 대부분 뚫어서 이어 준다
+  for (let y = 1; y < ROWS - 1; y += 2) for (let x = 1; x < COLS - 1; x += 2) {
+    const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    if (dirs.filter(([dx, dy]) => g[y + dy][x + dx] === 0).length !== 1 || Math.random() < .2) continue;
+    const opts = dirs.filter(([dx, dy]) => g[y + dy][x + dx] === 1 && g[y + 2 * dy]?.[x + 2 * dx] === 0 && x + 2 * dx > 0 && x + 2 * dx < COLS - 1 && y + 2 * dy > 0 && y + 2 * dy < ROWS - 1);
+    if (opts.length) { const [dx, dy] = opts[rnd(opts.length)]; g[y + dy][x + dx] = 0; }
   }
   // 교실 같은 넓은 칸 몇 개
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < 8; i++) {
     const cx = 3 + rnd(COLS - 6), cy = 3 + rnd(ROWS - 6);
     for (let y = cy - 1; y <= cy + 1; y++) for (let x = cx - 1; x <= cx + 1; x++) g[y][x] = 0;
   }
@@ -99,6 +107,7 @@ function start() {
   player = { ...center(1, 1) };
   got = 0; battery = 100; lightOn = true; aim = 0; mouseAt = 0; scareAt = 0; pathT = 0; distP = null; flick = 1;
   hidden = null; breath = 100; wanderUntil = 0; lightBefore = true;
+  seen = Array.from({ length: ROWS }, () => Array(COLS).fill(false));
   msg = '열쇠 3개를 찾아 비상구로 탈출하세요'; msgAt = performance.now();
   t0 = performance.now(); last = t0;
   state = 'play'; veil.hidden = true;
@@ -172,10 +181,23 @@ function update(now) {
   if (keys.KeyA || keys.ArrowLeft) mx--; if (keys.KeyD || keys.ArrowRight) mx++;
   if (keys.KeyW || keys.ArrowUp) my--; if (keys.KeyS || keys.ArrowDown) my++;
   if ((mx || my) && !hidden) {
-    const l = Math.hypot(mx, my);
-    move(player, mx / l * P_SPEED * dt, my / l * P_SPEED * dt, P_R);
+    const l = Math.hypot(mx, my), step = P_SPEED * dt;
+    const bx = player.x, by = player.y;
+    move(player, mx / l * step, my / l * step, P_R);
+    // 모퉁이 도움: 가려는 쪽 칸이 뚫려 있는데 벽 모서리에 걸리면, 길 가운데로 살짝 밀어 준다
+    if (mx && player.x === bx) {
+      const rowC = Math.floor(player.y / T) * T + T / 2, off = rowC - player.y;
+      if (!wall(player.x + Math.sign(mx) * (T / 2 + 2), rowC) && Math.abs(off) > .5) move(player, 0, Math.sign(off) * Math.min(Math.abs(off), step), P_R);
+    }
+    if (my && player.y === by) {
+      const colC = Math.floor(player.x / T) * T + T / 2, off = colC - player.x;
+      if (!wall(colC, player.y + Math.sign(my) * (T / 2 + 2)) && Math.abs(off) > .5) move(player, Math.sign(off) * Math.min(Math.abs(off), step), 0, P_R);
+    }
     if (now - mouseAt > 1500) aim = Math.atan2(my, mx);
   }
+  // 본 칸 기억: 내 주변
+  const [stx, sty] = tileOf(player);
+  for (let y = sty - 2; y <= sty + 2; y++) for (let x = stx - 2; x <= stx + 2; x++) if (seen[y] && x >= 0 && x < COLS) seen[y][x] = true;
   // 배터리
   if (lightOn && battery > 0) { battery = Math.max(0, battery - dt * 1.6); if (battery === 0) say('손전등이 꺼졌어요… 건전지를 찾으세요'); }
   // 숨: 숨어 있으면 줄고, 다 떨어지면 저절로 튀어나온다
@@ -368,7 +390,7 @@ function drawWorld(now, cx, cy) {
 function drawDark(cx, cy) {
   dctx.globalCompositeOperation = 'source-over';
   dctx.clearRect(0, 0, VW, VH);
-  dctx.fillStyle = 'rgba(2,2,6,.97)'; dctx.fillRect(0, 0, VW, VH);
+  dctx.fillStyle = 'rgba(2,2,6,.95)'; dctx.fillRect(0, 0, VW, VH);
   dctx.globalCompositeOperation = 'destination-out';
   const px = player.x - cx, py = player.y - cy;
   let g = dctx.createRadialGradient(px, py, 0, px, py, AMB_R);
@@ -381,7 +403,11 @@ function drawDark(cx, cy) {
     for (let i = 0; i <= N; i++) {
       const a = aim - BEAM_A + 2 * BEAM_A * i / N;
       let r = 0;
-      while (r < R && !wall(player.x + Math.cos(a) * r, player.y + Math.sin(a) * r)) r += 6;
+      while (r < R && !wall(player.x + Math.cos(a) * r, player.y + Math.sin(a) * r)) {
+        const sx = Math.floor((player.x + Math.cos(a) * r) / T), sy = Math.floor((player.y + Math.sin(a) * r) / T);
+        if (seen[sy]) { seen[sy][sx] = true; if (seen[sy - 1]) seen[sy - 1][sx] = true; if (seen[sy + 1]) seen[sy + 1][sx] = true; if (sx > 0) seen[sy][sx - 1] = true; if (sx < COLS - 1) seen[sy][sx + 1] = true; }
+        r += 6;
+      }
       pts.push([px + Math.cos(a) * (r + 4), py + Math.sin(a) * (r + 4)]);
     }
     g = dctx.createRadialGradient(px, py, 10, px, py, R);
@@ -389,6 +415,17 @@ function drawDark(cx, cy) {
     dctx.fillStyle = g; dctx.beginPath(); dctx.moveTo(px, py); for (const [x, y] of pts) dctx.lineTo(x, y); dctx.closePath(); dctx.fill();
   }
   ctx.drawImage(dark, 0, 0, VW, VH);
+  // 본 길 기억: 어둠 위에 길과 벽 윤곽만 흐리게(유령은 보이지 않는다)
+  const x0 = Math.max(0, Math.floor(cx / T)), y0 = Math.max(0, Math.floor(cy / T));
+  const x1 = Math.min(COLS - 1, Math.floor((cx + VW) / T)), y1 = Math.min(ROWS - 1, Math.floor((cy + VH) / T));
+  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+    if (!seen[y][x]) continue;
+    const sx = x * T - cx, sy = y * T - cy;
+    if (map[y][x] === 1) { ctx.fillStyle = 'rgba(95,90,110,.32)'; ctx.fillRect(sx, sy, T, T); ctx.fillStyle = 'rgba(140,132,160,.25)'; ctx.fillRect(sx, sy, T, 3); }
+    else { ctx.fillStyle = 'rgba(110,90,70,.14)'; ctx.fillRect(sx + 1, sy + 1, T - 2, T - 2); }
+  }
+  for (const l of lockers) if (seen[l.ty][l.tx]) { ctx.fillStyle = 'rgba(120,140,155,.35)'; ctx.fillRect(l.tx * T - cx + 9, l.ty * T - cy + 3, T - 18, T - 6); }
+  if (seen[exit.ty][exit.tx]) { ctx.fillStyle = 'rgba(60,160,90,.45)'; ctx.fillRect(exit.tx * T - cx + 4, exit.ty * T - cy + 4, T - 8, T - 8); }
   // 빛 색감
   if (lightOn && battery > 0) {
     ctx.save(); ctx.globalCompositeOperation = 'overlay'; ctx.globalAlpha = .18 * flick;

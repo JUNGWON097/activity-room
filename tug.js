@@ -1,4 +1,4 @@
-import { initGamePage, showResult, setupCanvas } from './common.js?v=17';
+import { initGamePage, showResult, setupCanvas } from './common.js?v=18';
 
 initGamePage('tug');
 
