@@ -1,4 +1,4 @@
-import { initGamePage, showResult, setupCanvas, canvasPoint } from './common.js?v=15';
+import { initGamePage, showResult, setupCanvas, canvasPoint } from './common.js?v=16';
 
 initGamePage('omok');
 
@@ -12,7 +12,8 @@ const ME = 1, AI = 2;
 const DIRS = [[1, 0], [0, 1], [1, 1], [1, -1]];
 // 5칸 창 하나에 같은 색 돌이 n개(상대 돌 없음)일 때의 값
 const WIN_VAL = [0, 2, 24, 260, 4000, 1e7];
-const CARELESS = 0.45;   // 컴퓨터가 방심하는 수의 비율
+const CARELESS = 0.65;   // 컴퓨터가 방심해 3을 놓치는 수의 비율
+const BLIND = 0.1;       // 5목 직전(4)마저 못 보는 비율
 
 let state = 'ready';   // ready → me → ai → won/lost → done
 let board, moves, lastMove, hover = null, winLine = null, myCount = 0;
@@ -63,7 +64,6 @@ function isDoubleThree(x, y, c) {
   board[y][x] = 0;
   return n >= 2;
 }
-let warnAt = 0;
 
 function put(x, y, c, now) {
   board[y][x] = c; moves++; lastMove = { x, y, t: now };
@@ -104,18 +104,21 @@ function evalCell(x, y, c) {
 function aiMove() {
   if (state !== 'ai') return;
   let best = null, bestV = -1;
-  // 방심한 수: 5목 직전(4)은 막지만 3 이하 수비는 거의 보지 않는다
+  // 방심한 수: 3 이하 수비는 거의 보지 않는다. 가끔은 5목 직전(4)도 못 본다
   const careless = Math.random() < CARELESS;
+  const blind = Math.random() < BLIND;
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
     if (board[y][x]) continue;
     let near = false;
     for (let j = -2; j <= 2 && !near; j++) for (let i = -2; i <= 2; i++)
       if (inside(x + i, y + j) && board[y + j][x + i]) { near = true; break; }
     if (!near || isDoubleThree(x, y, AI)) continue;
-    const atk = evalCell(x, y, AI);
+    let atk = evalCell(x, y, AI);
+    if (atk < WIN_VAL[5]) atk *= .55;   // 공격도 덜 적극적으로(5목 완성은 그대로)
     let def = evalCell(x, y, ME);
-    if (def < WIN_VAL[5]) def *= careless ? .15 : .7;
-    const v = atk * 1.05 + def + Math.random() * 60;
+    if (def < WIN_VAL[5]) def *= careless ? .12 : .5;
+    else if (blind) def = WIN_VAL[3];
+    const v = atk + def + Math.random() * 160;
     if (v > bestV) { bestV = v; best = [x, y]; }
   }
   if (!best) best = [7, 7];
@@ -135,7 +138,6 @@ cv.addEventListener('pointerdown', e => {
   if (e.button !== 0 || state !== 'me') return;
   const c = cellAt(canvasPoint(cv, W, e));
   if (!c || board[c.y][c.x]) return;
-  if (isDoubleThree(c.x, c.y, ME)) { warnAt = performance.now(); return; }
   put(c.x, c.y, ME, performance.now());
 });
 
@@ -159,9 +161,7 @@ function draw(now) {
   // 상태 띠
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.font = '800 17px Pretendard, sans-serif'; ctx.fillStyle = INK;
-  const warn = now - warnAt < 1500;
-  if (warn) ctx.fillStyle = '#ff5c7a';
-  const msg = warn && state === 'me' ? '쌍삼(3·3)은 둘 수 없어요 🙅' : { ready: '흑돌(나)부터 시작해요', me: `내 차례 · 흑돌 ${myCount}개`, ai: '컴퓨터가 생각 중…', won: '내가 이겼어요! 🎉', lost: '컴퓨터가 이겼어요', draw: '비겼어요', done: '' }[state];
+  const msg = { ready: '흑돌(나)부터 시작해요', me: `내 차례 · 흑돌 ${myCount}개`, ai: '컴퓨터가 생각 중…', won: '내가 이겼어요! 🎉', lost: '컴퓨터가 이겼어요', draw: '비겼어요', done: '' }[state];
   ctx.fillText(msg, W / 2, TOP / 2 + 2);
 
   // 판
@@ -185,14 +185,7 @@ function draw(now) {
     ctx.fillStyle = '#ff5c7a';
     ctx.beginPath(); ctx.arc(px(lastMove.x), py(lastMove.y), 4, 0, Math.PI * 2); ctx.fill();
   }
-  if (state === 'me' && hover && !board[hover.y][hover.x]) {
-    if (isDoubleThree(hover.x, hover.y, ME)) {
-      // 쌍삼 자리: 빨간 ✕
-      const x = px(hover.x), y = py(hover.y), r = GAP * .26;
-      ctx.strokeStyle = '#ff5c7a'; ctx.lineWidth = 3.5; ctx.lineCap = 'round';
-      ctx.beginPath(); ctx.moveTo(x - r, y - r); ctx.lineTo(x + r, y + r); ctx.moveTo(x + r, y - r); ctx.lineTo(x - r, y + r); ctx.stroke();
-    } else stone(px(hover.x), py(hover.y), ME, .4);
-  }
+  if (state === 'me' && hover && !board[hover.y][hover.x]) stone(px(hover.x), py(hover.y), ME, .4);
   if (winLine) {
     const pulse = .6 + .4 * Math.sin(now / 120);
     ctx.strokeStyle = `rgba(255,92,122,${pulse})`; ctx.lineWidth = 4;
