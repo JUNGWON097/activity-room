@@ -1,4 +1,4 @@
-import { initGamePage, showResult, setupCanvas, canvasPoint } from './common.js?v=11';
+import { initGamePage, showResult, setupCanvas, canvasPoint } from './common.js?v=12';
 
 initGamePage('omok');
 
@@ -12,6 +12,7 @@ const ME = 1, AI = 2;
 const DIRS = [[1, 0], [0, 1], [1, 1], [1, -1]];
 // 5칸 창 하나에 같은 색 돌이 n개(상대 돌 없음)일 때의 값
 const WIN_VAL = [0, 2, 24, 260, 4000, 1e7];
+const CARELESS = 0.45;   // 컴퓨터가 방심하는 수의 비율
 
 let state = 'ready';   // ready → me → ai → won/lost → done
 let board, moves, lastMove, hover = null, winLine = null, myCount = 0;
@@ -74,14 +75,18 @@ function evalCell(x, y, c) {
 function aiMove() {
   if (state !== 'ai') return;
   let best = null, bestV = -1;
+  // 방심한 수: 5목 직전(4)은 막지만 3 이하 수비는 거의 보지 않는다
+  const careless = Math.random() < CARELESS;
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
     if (board[y][x]) continue;
     let near = false;
     for (let j = -2; j <= 2 && !near; j++) for (let i = -2; i <= 2; i++)
       if (inside(x + i, y + j) && board[y + j][x + i]) { near = true; break; }
     if (!near) continue;
-    const atk = evalCell(x, y, AI), def = evalCell(x, y, ME);
-    const v = atk * 1.05 + def + Math.random() * 6;
+    const atk = evalCell(x, y, AI);
+    let def = evalCell(x, y, ME);
+    if (def < WIN_VAL[5]) def *= careless ? .15 : .7;
+    const v = atk * 1.05 + def + Math.random() * 60;
     if (v > bestV) { bestV = v; best = [x, y]; }
   }
   if (!best) best = [7, 7];
