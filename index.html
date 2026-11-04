@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>액티비티룸</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
-<link rel="stylesheet" href="style.css?v=12">
+<link rel="stylesheet" href="style.css?v=13">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🕹️</text></svg>">
 </head>
 <body>
@@ -21,7 +21,7 @@
 <p class="foot">랭킹에는 게임마다 닉네임별 최고 기록 1개만 남아요. 닉네임은 이 브라우저에 기억돼요.</p>
 
 <script type="module">
-import { GAMES, GAME_IDS, QS, DEV, esc, fmt, topScores, getNick, askNick } from './common.js?v=12';
+import { GAMES, GAME_IDS, QS, DEV, esc, fmt, topScores, getNick, askNick } from './common.js?v=13';
 
 const grid = document.getElementById('grid');
 grid.innerHTML = GAME_IDS.map(id => {
@@ -30,7 +30,7 @@ grid.innerHTML = GAME_IDS.map(id => {
     <div class="head"><div class="ic">${g.icon}</div>
       <div><h2>${g.name}</h2><p class="tag">${g.tagline}</p></div></div>
     <div class="mini" id="mini-${id}"><p class="muted empty">불러오는 중…</p></div>
-    <span class="btn primary play">플레이</span>
+    <span class="btn primary play">${g.free ? '꾸미기' : '플레이'}</span>
   </a>`;
 }).join('');
 document.querySelector('.hero p').textContent = `각자 플레이하고 기록으로 겨루는 미니게임 ${GAME_IDS.length}종`;
@@ -46,6 +46,7 @@ const medal = ['🥇', '🥈', '🥉'];
 function loadMinis() {
   GAME_IDS.forEach(async id => {
     const el = document.getElementById('mini-' + id);
+    if (GAMES[id].free) { el.innerHTML = '<p class="muted empty">점수 없이 자유롭게 꾸며요 ✨</p>'; return; }
     try {
       const rows = await topScores(id, 3);
       el.innerHTML = rows.length

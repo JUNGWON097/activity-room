@@ -112,6 +112,14 @@ export const GAMES = {
       score: '이길 때까지 놓은 흑돌 수 · 적을수록 1등. 지거나 비기면 기록이 남지 않아요.',
       tips: ['흑돌(나)이 먼저 둬요. 3·3 금지 같은 규칙은 없고, 6개 이상 이어도 이겨요.', '컴퓨터는 4는 꼭 막지만 열린 3은 가끔 놓쳐요. 양쪽이 열린 3을 만들어 보세요.', '두 군데를 한 번에 노리는 <b>4·3</b>을 만들면 컴퓨터가 다 막을 수 없어요.', '마지막에 놓인 돌에는 빨간 점이 찍혀요.'],
     } },
+  makeup: { name: '메이크업 & 코디', icon: '💄', free: true,
+    tagline: '화장하고 옷 입히고, 사진으로 남기기',
+    how: {
+      goal: '피부 · 헤어 · 눈썹 · 아이섀도 · 볼터치 · 립으로 화장하고, 옷 · 겉옷 · 목걸이 · 액세서리로 코디해 나만의 캐릭터를 꾸며 보세요.',
+      keys: [['오른쪽 탭', '꾸밀 부위 고르기'], ['색 · 모양 클릭', '바로 적용 (액세서리와 스티커는 여러 개 고를 수 있어요)'], ['🎲 랜덤', '전부 무작위로 꾸미기'], ['📷 사진 저장', '지금 모습을 그림 파일로 저장']],
+      score: '점수와 랭킹이 없는 놀이예요.',
+      tips: ['같은 액세서리를 한 번 더 누르면 빠져요.', '마음에 드는 조합이 나오면 사진으로 저장해 두세요. 새로 고치면 처음 모습으로 돌아가요.'],
+    } },
 };
 export const GAME_IDS = Object.keys(GAMES);
 
@@ -219,8 +227,10 @@ export function initGamePage(id) {
   // 시작 화면에도 조작법을 짧게 보여 준다
   document.querySelectorAll('.veil > div').forEach(v => v.insertAdjacentHTML('beforeend',
     `<ul class="veil-keys">${g.how.keys.map(([k, d]) => `<li><kbd>${k}</kbd> ${d}</li>`).join('')}</ul>`));
-  document.querySelector('.nick-chip').addEventListener('click', () => askNick().then(() => loadBoard(id, document.getElementById('board'))));
   paintNickChips();
+  // free: 점수 없이 노는 게임은 랭킹을 부르지 않는다
+  if (g.free) { document.querySelector('.nick-chip').addEventListener('click', () => askNick()); return; }
+  document.querySelector('.nick-chip').addEventListener('click', () => askNick().then(() => loadBoard(id, document.getElementById('board'))));
   loadBoard(id, document.getElementById('board'));
 }
 
