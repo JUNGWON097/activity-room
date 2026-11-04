@@ -31,7 +31,7 @@ const DEFAULT = {
   shadow: 1, glitter: 'champagne', liner: 'puppy', lash: 'volume', lens: 0,
   blush: 1, blushLv: 'normal', lip: 3, lipFin: 'glossy',
   hair: 'wave', bangs: 'seethrough', hairCol: 1,
-  acc: { ribbon: true, pearl: true }, top: 'lace', topCol: 0, bg: 0,
+  acc: { pearl: true }, top: 'lace', topCol: 0, bg: 0,
 };
 let S = structuredClone(DEFAULT);
 
@@ -98,153 +98,182 @@ const HAIR_SHAPE = {
   hippie: { len: 670, outX: 82, amp: 24, waves: 6 },
   bob: { len: 530, outX: 162, amp: 0, waves: 0 },
 };
-function backHair(c) {
+// 같은 그림이 매번 같게 나오도록 고정 난수
+function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+
+function backHairD() {
   const sh = HAIR_SHAPE[S.hair];
-  if (S.hair === 'bob') {
-    return `<path d="M300,96 C204,96 150,170 150,292 C150,392 146,468 166,520 C186,552 230,552 244,530 L356,530 C370,552 414,552 434,520 C454,468 450,392 450,292 C450,170 396,96 300,96Z" fill="url(#hairG)"/>`;
-  }
+  if (S.hair === 'bob') return 'M300,92 C202,92 148,168 148,292 C148,392 144,468 164,520 C184,552 230,552 244,530 L356,530 C370,552 416,552 436,520 C456,468 452,392 452,292 C452,168 398,92 300,92Z';
   const L = sideEdge(150, 300, sh.outX, sh.len, sh.amp, sh.waves);
   const R = sideEdge(450, 300, W - sh.outX, sh.len, sh.amp, sh.waves).reverse();
-  let d = `M300,94 C206,94 150,168 150,300${smooth(L)} L${W - sh.outX},${sh.len} L${R[0][0]},${R[0][1]}${smooth(R)} C450,168 394,94 300,94Z`;
-  return `<path d="${d}" fill="url(#hairG)"/>`;
+  return `M300,90 C204,90 150,166 150,300${smooth(L)} L${W - sh.outX},${sh.len} L${R[0][0]},${R[0][1]}${smooth(R)} C450,166 396,90 300,90Z`;
 }
-function frontHair(c) {
+// 얼굴 옆 머리 한쪽(왼쪽). 오른쪽은 뒤집어 쓴다
+function sideD() {
   const sh = HAIR_SHAPE[S.hair];
-  const light = mix(c, '#ffffff', .35), dark = mix(c, '#000000', .3);
+  if (S.hair === 'bob') return 'M300,110 C232,112 176,168 166,262 C158,350 162,440 172,520 C186,536 208,530 210,512 C196,440 188,360 188,292 C192,216 246,172 300,160Z';
+  const end = Math.min(sh.len - 30, 640), wav = sh.amp;
+  const out = sideEdge(166, 262, 146 - wav * .4, end, wav * .8, sh.waves, 12);
+  const inn = sideEdge(186, 292, 186 - wav * .3, end - 10, wav * .8, sh.waves, 12).reverse();
+  return `M300,110 C232,112 176,168 166,262${smooth(out)} L${inn[0][0]},${inn[0][1]}${smooth(inn)} C192,216 246,172 300,160Z`;
+}
+const CROWN_D = 'M168,312 C160,176 222,94 300,94 C378,94 440,176 432,312 C424,228 384,170 300,164 C216,170 176,228 168,312Z';
+function bangsD() {
+  if (S.bangs === 'full') {
+    let d = 'M192,206 C202,152 252,138 300,138 C348,138 398,152 408,206 L412,262';
+    const xs = [412, 390, 368, 346, 324, 302, 280, 258, 234, 212, 190];
+    for (let i = 1; i < xs.length; i++) d += ` Q${f((xs[i - 1] + xs[i]) / 2)},${i % 2 ? 274 : 268} ${xs[i]},${262 + (i % 3) * 3}`;
+    return [d + ' Z'];
+  }
+  if (S.bangs === 'curtain') {
+    const l = 'M300,150 C266,164 232,204 214,284 C210,296 202,296 200,282 C208,212 246,160 300,142Z';
+    return [l, mirror(l)];
+  }
+  return [];
+}
+// 머리결: 정수리에서 끝까지 내려가는 가는 선을 잔뜩, 머리 모양 안쪽에만
+function strands(c, n, seed, front) {
+  const r = rng(seed), sh = HAIR_SHAPE[S.hair];
+  const light = mix(c, '#ffffff', .45), dark = mix(c, '#000000', .45);
   let s = '';
-  // 정수리 · 이마 위 머리
-  s += `<path d="M168,312 C160,176 222,96 300,96 C378,96 440,176 432,312 C424,226 384,166 300,160 C216,166 176,226 168,312Z" fill="url(#hairG)"/>`;
-  // 얼굴 옆 머리(양쪽)
-  const end = S.hair === 'bob' ? 528 : Math.min(sh.len - 30, 640);
-  const wav = sh.amp;
-  let side;
-  if (S.hair === 'bob') side = `M300,112 C232,114 176,170 166,262 C158,350 162,440 172,520 C186,536 208,530 210,512 C196,440 186,360 186,290 C190,214 246,168 300,156Z`;
-  else {
-    const out = sideEdge(166, 262, 146 - wav * .4, end, wav * .8, sh.waves, 12);
-    const inn = sideEdge(184, 290, 184 - wav * .3, end - 10, wav * .8, sh.waves, 12).reverse();
-    side = `M300,112 C232,114 176,170 166,262${smooth(out)} L${inn[0][0]},${inn[0][1]}${smooth(inn)} C190,214 246,168 300,156Z`;
+  for (let i = 0; i < n; i++) {
+    const side = i % 2 ? 1 : -1, k = r();
+    const sx = 300 + side * (6 + r() * 30), sy = 96 + r() * 14;
+    const midX = 300 + side * (148 + (k - .5) * 40);
+    const endY = S.hair === 'bob' ? 500 + r() * 30 : sh.len - 20 - r() * 70;
+    const endX = S.hair === 'bob' ? 300 + side * (128 + r() * 24) : 300 + side * (300 - sh.outX - 10 + (r() - .5) * 60);
+    const pts = sideEdge(midX, 300, endX, endY, sh.amp * (.7 + r() * .6), sh.waves, 10);
+    const d = `M${f(sx)},${f(sy)} C${f(300 + side * (70 + k * 60))},${f(104 + r() * 20)} ${f(300 + side * (138 + k * 30))},${f(190 + r() * 40)} ${pts[0][0]},${pts[0][1]}${smooth(pts)}`;
+    const isLight = r() < .45;
+    s += `<path d="${d}" stroke="${isLight ? light : dark}" stroke-opacity="${f(isLight ? .12 + r() * .18 : .14 + r() * .2)}" stroke-width="${f(.8 + r() * 2.2)}" fill="none" stroke-linecap="round"/>`;
   }
-  s += both(`<path d="${side}" fill="url(#hairG)"/>`);
-  // 결 · 윤기
-  const strands = S.hair === 'bob'
-    ? ['M296,118 C240,124 190,176 178,262 C170,360 172,440 184,512', 'M270,126 C226,148 196,200 186,280']
-    : ['M296,118 C240,124 190,176 176,262 C170,360 166,470 158,600', 'M272,128 C224,150 194,206 180,290 C174,380 170,470 164,560'];
-  if (S.hair !== 'bob') s += both(`<path d="M172,330 C166,430 160,520 154,${Math.min(sh.len - 60, 620)}" stroke="${light}" stroke-opacity=".2" stroke-width="3" fill="none" stroke-linecap="round"/>`);
-  for (const st of strands) s += both(`<path d="${st}" stroke="${dark}" stroke-opacity=".28" stroke-width="2" fill="none" stroke-linecap="round"/>`);
-  s += both(`<path d="M290,122 C246,128 210,168 196,226" stroke="${light}" stroke-opacity=".55" stroke-width="7" fill="none" stroke-linecap="round" filter="url(#b2)"/>`);
-  s += `<ellipse cx="300" cy="122" rx="86" ry="16" fill="${light}" opacity=".35" filter="url(#b8)"/>`;
-  // 앞머리
-  if (S.bangs === 'none') {
-    s += `<path d="M300,98 Q296,128 300,158" stroke="${mix(S.skinCol, dark, .5)}" stroke-width="3" fill="none" stroke-linecap="round" opacity=".6"/>`;
-  } else if (S.bangs === 'full') {
-    let d = 'M190,206 C200,150 250,138 300,138 C350,138 400,150 410,206 L414,268';
-    const xs = [414, 392, 368, 344, 320, 298, 276, 252, 230, 208, 188];
-    for (let i = 1; i < xs.length; i++) d += ` Q${f((xs[i - 1] + xs[i]) / 2)},${i % 2 ? 278 : 270} ${xs[i]},${266 + (i % 3) * 3}`;
-    d += ' Z';
-    s += `<path d="${d}" fill="url(#hairG)"/>`;
-    for (let x = 214; x < 400; x += 26) s += `<path d="M${x + 6},150 Q${x},210 ${x - 2},262" stroke="${dark}" stroke-opacity=".22" stroke-width="2" fill="none"/>`;
-    s += `<path d="M236,160 Q300,146 364,160" stroke="${light}" stroke-opacity=".5" stroke-width="6" fill="none" stroke-linecap="round" filter="url(#b2)"/>`;
-  } else if (S.bangs === 'seethrough') {
-    // 가는 가닥 사이로 이마가 보이게
-    // 얇게 비치는 앞머리: 반투명 막 + 가는 가닥 몇 줄, 끝은 부드럽게
-    let d = 'M200,206 C208,154 254,138 300,138 C346,138 392,154 400,206 L398,250';
-    const tips = [[386, 258], [366, 250], [346, 262], [326, 252], [304, 264], [282, 252], [262, 262], [240, 250], [220, 258], [202, 250]];
-    let px = 398, py = 250;
-    for (const [x, y] of tips) { d += ` Q${f((px + x) / 2)},${f(Math.max(py, y) + 10)} ${x},${y}`; px = x; py = y; }
-    d += ' Z';
-    s += `<g filter="url(#b1)"><path d="${d}" fill="url(#hairG)" opacity=".62"/>`;
-    for (const [i, [x, y]] of tips.entries()) {
-      const top = 150 + Math.abs(x - 300) * .1;
-      s += `<path d="M${x + (i % 2 ? 6 : -6)},${top} C${x + (i % 2 ? 4 : -4)},${f(top + 40)} ${x + 1},${y - 30} ${x},${y + 6}" stroke="${i % 3 ? c : dark}" stroke-opacity=".7" stroke-width="${3 + (i % 3)}" fill="none" stroke-linecap="round"/>`;
-    }
-    s += `</g>`;
-    s += `<path d="M204,194 C222,152 270,140 300,140 C330,140 378,152 396,194 C368,166 330,156 300,156 C270,156 232,166 204,194Z" fill="url(#hairG)"/>`;
-  } else if (S.bangs === 'curtain') {
-    s += both(`<path d="M300,146 C268,160 230,200 212,288 C208,300 200,300 198,286 C206,214 244,160 300,140Z" fill="url(#hairG)"/><path d="M290,152 C258,174 230,214 216,276" stroke="${light}" stroke-opacity=".45" stroke-width="3" fill="none"/>`);
-  }
+  // 앞머리 결
+  if (front && S.bangs === 'full') for (let i = 0; i < 26; i++) { const x = 200 + r() * 200; s += `<path d="M${f(300 + (x - 300) * .6)},${f(140 + r() * 10)} Q${f(x)},${f(200)} ${f(x + (x - 300) * .05)},${f(260 + r() * 10)}" stroke="${r() < .5 ? light : dark}" stroke-opacity=".2" stroke-width="${f(.8 + r() * 1.6)}" fill="none"/>`; }
+  if (front && S.bangs === 'curtain') for (let i = 0; i < 16; i++) { const o = r() * 18; s += both(`<path d="M${f(298 - o * .3)},${f(146 + o * .3)} C${f(266 - o)},${f(166 + o)} ${f(234 - o)},${f(208 + o)} ${f(214 - o * .4)},${f(282 - o * .6)}" stroke="${r() < .5 ? light : dark}" stroke-opacity=".22" stroke-width="1.2" fill="none"/>`); }
   return s;
 }
+function hairBack(c) {
+  return `<path d="${backHairD()}" fill="url(#hairG)"/><g clip-path="url(#hairBackClip)">${strands(c, 70, 7, false)}</g>`;
+}
+function hairFront(c) {
+  const light = mix(c, '#ffffff', .4), dark = mix(c, '#000000', .3);
+  let s = `<path d="${CROWN_D}" fill="url(#hairG)"/>` + both(`<path d="${sideD()}" fill="url(#hairG)"/>`);
+  for (const d of bangsD()) s += `<path d="${d}" fill="url(#hairG)"/>`;
+  if (S.bangs === 'seethrough') {
+    // 시스루뱅: 얇게 비치는 가닥들
+    const r = rng(11);
+    s += `<path d="M206,196 C224,152 270,140 300,140 C330,140 376,152 394,196 C368,168 330,158 300,158 C270,158 232,168 206,196Z" fill="url(#hairG)"/>`;
+    s += `<path d="M214,200 C230,160 370,160 386,200 L382,246 Q300,232 218,246Z" fill="${c}" opacity=".28" filter="url(#b4)"/>`;
+    for (let i = 0; i < 70; i++) {
+      const x = 216 + r() * 168, tip = 232 + r() * 30 - Math.abs(x - 300) * .06;
+      const w = .8 + r() * 1.8;
+      s += `<path d="M${f(300 + (x - 300) * .7)},${f(144 + r() * 6)} C${f(x - 2)},${f(180)} ${f(x + (x - 300) * .06)},${f(tip - 30)} ${f(x + (x - 300) * .1)},${f(tip)}" stroke="${r() < .3 ? mix(c, '#ffffff', .2) : c}" stroke-width="${f(w)}" stroke-opacity="${f(.45 + r() * .4)}" fill="none" stroke-linecap="round"/>`;
+    }
+  }
+  s += `<g clip-path="url(#hairFrontClip)">${strands(c, 60, 23, true)}</g>`;
+  if (S.bangs === 'none') s += `<path d="M300,96 Q297,130 300,164" stroke="${dark}" stroke-width="2.4" fill="none" stroke-linecap="round" opacity=".55"/>`;
+  // 윤기 띠
+  s += `<g clip-path="url(#hairFrontClip)"><path d="M196,214 C214,148 386,148 404,214" stroke="${light}" stroke-opacity=".32" stroke-width="16" fill="none" filter="url(#b8)"/></g>`;
+  return s;
+}
+function hairClips() {
+  const front = [CROWN_D, sideD(), mirror(sideD()), ...bangsD()].map(d => `<path d="${d}"/>`).join('');
+  return `<clipPath id="hairBackClip"><path d="${backHairD()}"/></clipPath><clipPath id="hairFrontClip">${front}</clipPath>`;
+}
 
-/* ================= 얼굴 ================= */
-const FACE = 'M300,150 C388,150 436,208 436,300 C436,358 422,402 394,440 C366,478 330,498 300,500 C270,498 234,478 206,440 C178,402 164,358 164,300 C164,208 212,150 300,150Z';
-// 왼쪽 눈(화면 기준): 안쪽 눈머리 (282,342) → 바깥 눈꼬리 (190,330). 눈동자가 위아래 눈꺼풀에 걸치도록 납작한 아몬드형
-const EYE_IN = [282, 342], EYE_C1 = [270, 314], EYE_C2 = [228, 304], EYE_OUT = [190, 330];
-const EYE_SHAPE = 'M282,342 C270,314 228,304 190,330 C208,352 258,358 282,342Z';
+/* ================= 얼굴 (실사 비율) ================= */
+const FACE = 'M300,160 C380,160 432,214 432,300 C432,362 416,404 390,440 C362,478 330,498 300,500 C270,498 238,478 210,440 C184,404 168,362 168,300 C168,214 220,160 300,160Z';
+// 왼쪽 눈: 눈머리 (276,334) → 눈꼬리 (212,330). 폭은 얼굴의 1/5 정도
+const EYE_IN = [276, 334], EYE_C1 = [266, 314], EYE_C2 = [230, 309], EYE_OUT = [212, 330];
+const EYE_SHAPE = 'M276,334 C266,314 230,309 212,330 C226,344 262,348 276,334Z';
 
 function eyeLeft() {
-  const lens = LENS[S.lens][1];
+  const lens = LENS[S.lens][1], sk = S.skinCol;
   let s = '';
-  // 쌍꺼풀 선
-  s += `<path d="M280,330 C267,304 226,294 194,318" stroke="${mix(S.skinCol, '#6a3a30', .45)}" stroke-opacity=".5" stroke-width="1.8" fill="none" stroke-linecap="round"/>`;
-  // 흰자 · 렌즈
+  // 눈두덩 그늘 · 쌍꺼풀
+  s += `<ellipse cx="248" cy="318" rx="34" ry="12" fill="${mix(sk, '#8a5a4a', .5)}" opacity=".18" filter="url(#b4)"/>`;
+  s += `<path d="M274,324 C262,304 230,300 212,320" stroke="${mix(sk, '#6a3a30', .5)}" stroke-opacity=".45" stroke-width="1.3" fill="none" stroke-linecap="round"/>`;
+  // 흰자 · 눈동자
   s += `<g clip-path="url(#eyeClipL)">
-    <path d="${EYE_SHAPE}" fill="#fbf7f6"/>
-    <ellipse cx="237" cy="336" rx="23" ry="26" fill="url(#lensG)"/>
-    <ellipse cx="237" cy="336" rx="23" ry="26" fill="none" stroke="${mix(lens, '#000000', .5)}" stroke-width="2.4" opacity=".7"/>
-    <ellipse cx="237" cy="338" rx="8" ry="9" fill="#1d1416"/>
-    <path d="M186,326 C226,300 270,310 286,340 L286,296 L186,296Z" fill="#2a1418" opacity=".3"/>
-    <ellipse cx="228" cy="328" rx="6" ry="5" fill="#fff" opacity=".95"/>
-    <circle cx="247" cy="346" r="2.4" fill="#fff" opacity=".8"/>
-    <path d="M222,348 Q237,355 252,348" stroke="#fff" stroke-opacity=".3" stroke-width="3" fill="none"/>
+    <path d="${EYE_SHAPE}" fill="#f6f0ee"/>
+    <circle cx="245" cy="330" r="13.5" fill="url(#lensG)"/>
+    <circle cx="245" cy="330" r="13.5" fill="none" stroke="${mix(lens, '#000000', .55)}" stroke-width="1.6" opacity=".8"/>
+    <circle cx="245" cy="330.5" r="5" fill="#140c0e"/>
+    <path d="M208,328 C232,306 264,312 280,336 L280,300 L208,300Z" fill="#3a1e20" opacity=".32" filter="url(#b1)"/>
+    <circle cx="240" cy="325" r="2.6" fill="#fff" opacity=".95"/>
+    <circle cx="250" cy="335" r="1.2" fill="#fff" opacity=".7"/>
   </g>`;
-  // 애교살
-  s += `<path d="M276,352 C258,366 218,366 202,346" stroke="#fff" stroke-opacity=".3" stroke-width="6" fill="none" stroke-linecap="round" filter="url(#b4)"/>`;
-  s += `<path d="M276,358 C258,372 220,372 204,352" stroke="${mix(S.skinCol, '#8a5040', .5)}" stroke-opacity=".14" stroke-width="2" fill="none" stroke-linecap="round" filter="url(#b1)"/>`;
-  s += `<path d="M280,345 C262,358 220,358 196,334" stroke="#7a4a44" stroke-opacity=".3" stroke-width="1.4" fill="none" stroke-linecap="round"/>`;
+  // 아랫눈꺼풀 · 애교살
+  s += `<path d="M274,337 C260,346 228,346 214,333" stroke="${mix(sk, '#c08070', .3)}" stroke-width="1.6" fill="none" stroke-linecap="round" opacity=".7"/>`;
+  s += `<path d="M272,342 C258,352 228,352 216,340" stroke="#fff" stroke-opacity=".28" stroke-width="5" fill="none" stroke-linecap="round" filter="url(#b2)"/>`;
+  s += `<path d="M272,348 C258,357 230,357 218,346" stroke="${mix(sk, '#8a5040', .5)}" stroke-opacity=".12" stroke-width="2" fill="none" stroke-linecap="round" filter="url(#b1)"/>`;
   if (S.glitter !== 'none') {
     const gc = S.glitter === 'pink' ? '#ffd0e0' : '#fff2cf';
-    s += `<path d="M274,353 C254,368 222,368 206,350" stroke="${gc}" stroke-opacity=".85" stroke-width="5" fill="none" stroke-linecap="round" filter="url(#b1)"/>`;
-    for (const [x, y, r] of [[266, 358, 1.4], [254, 362, 1], [244, 363, 1.6], [232, 362, 1], [222, 358, 1.3], [260, 361, .8], [238, 365, .8]]) s += `<circle cx="${x}" cy="${y}" r="${r}" fill="#fff" opacity=".9"/>`;
-    s += sparkle(248, 364, 6);
+    s += `<path d="M270,342 C256,351 230,351 220,340" stroke="${gc}" stroke-opacity=".9" stroke-width="4" fill="none" stroke-linecap="round" filter="url(#b1)"/>`;
+    for (const [x, y, r] of [[264, 346, 1], [254, 348, .8], [246, 349, 1.2], [236, 348, .8], [228, 345, 1]]) s += `<circle cx="${x}" cy="${y}" r="${r}" fill="#fff"/>`;
+    s += sparkle(248, 348, 3.5);
   }
   // 윗눈꺼풀 선 · 아이라인
-  const lw = S.liner === 'none' ? 2.4 : S.liner === 'natural' ? 3.4 : 4.4;
-  const lc = S.liner === 'none' ? '#5a3a34' : '#2a1c1e';
-  s += `<path d="M282,342 C270,314 228,304 190,330" stroke="${lc}" stroke-width="${lw}" fill="none" stroke-linecap="round"/>`;
-  if (S.liner === 'puppy') s += `<path d="M199,322 C192,328 186,334 178,340 C188,339 196,336 202,330Z" fill="${lc}"/>`;
-  if (S.liner === 'cat') s += `<path d="M203,318 C194,317 186,315 174,310 C182,320 190,326 197,329Z" fill="${lc}"/>`;
-  // 속눈썹: 눈꼬리로 갈수록 길게
-  const n = { natural: 9, volume: 14, doll: 18 }[S.lash], base = { natural: 9, volume: 12, doll: 15 }[S.lash];
+  const lw = S.liner === 'none' ? 1.8 : S.liner === 'natural' ? 2.6 : 3.2;
+  const lc = S.liner === 'none' ? '#4a2e2a' : '#21161a';
+  s += `<path d="M276,334 C266,314 230,309 212,330" stroke="${lc}" stroke-width="${lw}" fill="none" stroke-linecap="round"/>`;
+  if (S.liner === 'puppy') s += `<path d="M218,326 C212,330 208,333 202,337 C209,337 214,334 219,330Z" fill="${lc}"/>`;
+  if (S.liner === 'cat') s += `<path d="M220,322 C213,321 207,319 199,315 C205,322 210,326 215,329Z" fill="${lc}"/>`;
+  // 속눈썹(짧고 촘촘하게, 눈꼬리로 갈수록 길게)
+  const n = { natural: 12, volume: 18, doll: 24 }[S.lash], base = { natural: 5, volume: 7, doll: 9 }[S.lash];
   for (let i = 0; i < n; i++) {
-    const t = .18 + .82 * i / (n - 1);
+    const t = .3 + .7 * i / (n - 1);
     const [x, y] = bez(EYE_IN, EYE_C1, EYE_C2, EYE_OUT, t);
-    const L = base * (.55 + t * .7);
-    const ang = -Math.PI / 2 - (.15 + t * .75);
-    const ex = x + Math.cos(ang) * L, ey = y + Math.sin(ang) * L;
-    s += `<path d="M${f(x)},${f(y)} Q${f(x + Math.cos(ang + .5) * L * .5)},${f(y + Math.sin(ang + .5) * L * .5)} ${f(ex)},${f(ey)}" stroke="#241819" stroke-width="${S.lash === 'doll' ? 1.8 : 1.4}" fill="none" stroke-linecap="round"/>`;
+    const L = base * (.6 + t * .8);
+    const ang = -Math.PI / 2 - (.25 + t * .7);
+    s += `<path d="M${f(x)},${f(y)} Q${f(x + Math.cos(ang + .5) * L * .5)},${f(y + Math.sin(ang + .5) * L * .5)} ${f(x + Math.cos(ang) * L)},${f(y + Math.sin(ang) * L)}" stroke="#1e1416" stroke-width="${S.lash === 'doll' ? 1.2 : .9}" fill="none" stroke-linecap="round" opacity=".9"/>`;
   }
-  // 아래 속눈썹
-  const low = S.lash === 'doll' ? [[248, 356], [232, 355], [218, 351], [206, 344]] : S.lash === 'volume' ? [[222, 352], [208, 345]] : [];
-  for (const [x, y] of low) s += `<path d="M${x},${y} Q${x - 1},${y + 3} ${x - 3},${y + 6}" stroke="#3a2a2a" stroke-width="1" fill="none" stroke-linecap="round" opacity=".55"/>`;
+  const low = S.lash === 'doll' ? [[256, 344], [244, 345], [232, 343], [222, 339]] : S.lash === 'volume' ? [[230, 343], [220, 338]] : [];
+  for (const [x, y] of low) s += `<path d="M${x},${y} L${x - 1.5},${y + 4}" stroke="#2a1c1e" stroke-width=".8" stroke-linecap="round" opacity=".6"/>`;
   return s;
 }
 function browLeft() {
   const d = {
-    straight: 'M286,286 C270,281 240,279 198,284 C228,283 260,286 286,293Z',
-    soft: 'M286,288 C268,278 238,272 196,284 C228,278 262,284 286,295Z',
-    arch: 'M286,290 C266,274 234,265 194,286 C226,274 262,282 286,297Z',
+    straight: 'M284,302 C270,296 244,293 222,293 C214,293 208,295 204,298 C216,297 236,298 252,300 C266,302 276,305 284,309Z',
+    soft: 'M284,303 C270,295 246,289 224,289 C214,290 208,293 204,298 C216,295 236,296 252,299 C266,302 276,305 284,310Z',
+    arch: 'M284,304 C270,293 248,285 228,285 C216,286 208,291 203,298 C216,293 236,294 252,298 C266,301 276,305 284,311Z',
   }[S.brow];
-  const col = BROW_COL[S.browCol][1] || mix(HAIR_COL[S.hairCol][1], '#6a5048', HAIR_COL[S.hairCol][1] === '#f2a7b4' || HAIR_COL[S.hairCol][1] === '#d8c3a5' ? .55 : .15);
-  return `<path d="${d}" fill="${col}" opacity=".72" filter="url(#b1)"/>`;
+  const hc = HAIR_COL[S.hairCol][1];
+  const col = BROW_COL[S.browCol][1] || mix(hc, '#5a4038', ['#f2a7b4', '#d8c3a5', '#b58d6f'].includes(hc) ? .55 : .2);
+  // 결이 보이게 짧은 털 몇 가닥을 얹는다
+  let hairs = '';
+  for (let i = 0; i < 14; i++) { const x = 210 + i * 5.4, y = 299 - Math.sin(i / 13 * Math.PI) * 6; hairs += `<path d="M${f(x)},${f(y + 3)} L${f(x - 4)},${f(y - 1.5)}" stroke="${col}" stroke-width="1" opacity=".5"/>`; }
+  return `<path d="${d}" fill="${col}" opacity=".62" filter="url(#b1)"/>${hairs}`;
+}
+function nose(skin) {
+  const sd = mix(skin, '#8a4a3e', .45);
+  return `<g filter="url(#b2)" opacity=".5"><path d="M287,322 C288,346 287,370 284,388" stroke="${sd}" stroke-width="3" fill="none"/></g>
+    <g filter="url(#b4)"><ellipse cx="300" cy="392" rx="9" ry="7" fill="#fff" opacity=".35"/><ellipse cx="300" cy="350" rx="3" ry="22" fill="#fff" opacity=".22"/></g>
+    <path d="M284,392 C279,398 282,406 290,405" stroke="${sd}" stroke-width="1.6" fill="none" stroke-linecap="round" opacity=".55"/>
+    <path d="M316,392 C321,398 318,406 310,405" stroke="${sd}" stroke-width="1.6" fill="none" stroke-linecap="round" opacity=".55"/>
+    <g filter="url(#b1)" fill="${mix(skin, '#5a2a24', .6)}" opacity=".55"><ellipse cx="292" cy="405" rx="4.5" ry="2"/><ellipse cx="308" cy="405" rx="4.5" ry="2"/></g>
+    <path d="M292,409 Q300,412 308,409" stroke="${sd}" stroke-width="2" fill="none" opacity=".25" filter="url(#b1)"/>
+    <path d="M295,416 L294,430 M305,416 L306,430" stroke="${sd}" stroke-width="2.4" opacity=".12" filter="url(#b2)"/>`;
 }
 function lips() {
-  const c = LIP[S.lip][1], deep = mix(c, '#5a1020', .35), light = mix(c, '#ffffff', .35);
-  const up = 'M268,458 C280,449 291,443 300,449 C309,443 320,449 332,458 C316,461 284,461 268,458Z';
-  const lo = 'M268,458 C284,461 316,461 332,458 C325,475 312,483 300,483 C288,483 275,475 268,458Z';
-  let s = `<g ${S.lipFin === 'blur' ? 'filter="url(#b1)"' : ''}>`;
+  const c = LIP[S.lip][1], deep = mix(c, '#4a0e1a', .4), light = mix(c, '#ffffff', .35);
+  const up = 'M267,444 C278,438 290,432 300,437 C310,432 322,438 333,444 C318,447 282,447 267,444Z';
+  const lo = 'M267,444 C282,447 318,447 333,444 C326,460 313,467 300,467 C287,467 274,460 267,444Z';
+  let s = `<ellipse cx="300" cy="474" rx="18" ry="5" fill="${mix(S.skinCol, '#8a4a3e', .4)}" opacity=".25" filter="url(#b4)"/>`;
+  s += `<g ${S.lipFin === 'blur' ? 'filter="url(#b1)"' : ''}>`;
   if (S.lipFin === 'blur') {
-    // 그라데이션: 바깥은 연하게, 안쪽은 진하게
-    s += `<path d="${up}" fill="${mix(c, S.skinCol, .55)}"/><path d="${lo}" fill="${mix(c, S.skinCol, .55)}"/>`;
-    s += `<ellipse cx="300" cy="462" rx="24" ry="12" fill="${c}" filter="url(#b4)"/>`;
+    s += `<path d="${up}" fill="${mix(c, S.skinCol, .6)}"/><path d="${lo}" fill="${mix(c, S.skinCol, .6)}"/>`;
+    s += `<ellipse cx="300" cy="447" rx="20" ry="9" fill="${c}" filter="url(#b4)"/>`;
   } else {
-    s += `<path d="${up}" fill="${mix(c, '#000000', .08)}"/><path d="${lo}" fill="url(#lipG)"/>`;
+    s += `<path d="${up}" fill="${mix(c, '#000000', .1)}"/><path d="${lo}" fill="url(#lipG)"/>`;
   }
-  s += `</g><path d="M270,458 C285,462 315,462 330,458" stroke="${deep}" stroke-width="1.8" fill="none" stroke-linecap="round"/>`;
+  s += `</g><path d="M268,444 C284,447.5 316,447.5 332,444" stroke="${deep}" stroke-width="1.5" fill="none" stroke-linecap="round" opacity=".8"/>`;
+  s += `<circle cx="267" cy="444" r="1.6" fill="${deep}" opacity=".5"/><circle cx="333" cy="444" r="1.6" fill="${deep}" opacity=".5"/>`;
   if (S.lipFin === 'glossy') {
-    s += `<path d="M284,470 C292,476 310,476 318,470" stroke="#fff" stroke-opacity=".75" stroke-width="4" fill="none" stroke-linecap="round" filter="url(#b1)"/>`;
-    s += `<ellipse cx="308" cy="472" rx="5" ry="2.4" fill="#fff" opacity=".9"/><ellipse cx="286" cy="451" rx="5" ry="1.8" fill="#fff" opacity=".55"/>`;
+    s += `<path d="M288,455 C294,460 306,460 312,455" stroke="#fff" stroke-opacity=".7" stroke-width="3" fill="none" stroke-linecap="round" filter="url(#b1)"/>`;
+    s += `<ellipse cx="306" cy="457" rx="3.6" ry="1.6" fill="#fff" opacity=".9"/><ellipse cx="288" cy="439" rx="3.5" ry="1.2" fill="#fff" opacity=".5"/>`;
   } else if (S.lipFin === 'matte') {
-    s += `<ellipse cx="300" cy="473" rx="12" ry="4" fill="${light}" opacity=".25" filter="url(#b2)"/>`;
+    s += `<ellipse cx="300" cy="457" rx="9" ry="3" fill="${light}" opacity=".2" filter="url(#b2)"/>`;
   }
   return s;
 }
@@ -294,7 +323,7 @@ function accessories(where) {
     return s;
   }
   // 머리 위
-  if (A.ribbon) s += bow(176, 190, .9, false) + bow(424, 190, .9, true);
+  if (A.ribbon) s += bow(170, 196, .62, false) + bow(430, 196, .62, true);
   if (A.flower) {
     s += '<g>';
     for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3; s += `<ellipse cx="${f(420 + Math.cos(a) * 14)}" cy="${f(236 + Math.sin(a) * 14)}" rx="13" ry="9" transform="rotate(${f(a * 180 / Math.PI)} ${f(420 + Math.cos(a) * 14)} ${f(236 + Math.sin(a) * 14)})" fill="#fff6f2" stroke="#f3d5d9" stroke-width="1.2"/>`; }
@@ -347,62 +376,58 @@ function svg(w = W, h = H) {
   const lens = LENS[S.lens][1];
   const lip = LIP[S.lip][1];
   const sh = SHADOW[S.shadow][1], bl = BLUSH[S.blush][1], hl = HIGHLIGHT[S.highlight][1];
-  const blushOp = { light: .38, normal: .58, deep: .8 }[S.blushLv];
-  const contourOp = { none: 0, soft: .32, strong: .55 }[S.contour];
+  const blushOp = { light: .32, normal: .5, deep: .72 }[S.blushLv];
+  const contourOp = { none: 0, soft: .3, strong: .52 }[S.contour];
 
   let s = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${w}" height="${h}">
   <defs>
     <linearGradient id="bgG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${bg1}"/><stop offset="1" stop-color="${bg2}"/></linearGradient>
-    <linearGradient id="hairG" gradientUnits="userSpaceOnUse" x1="0" y1="90" x2="0" y2="700"><stop offset="0" stop-color="${mix(hair, '#ffffff', .12)}"/><stop offset=".45" stop-color="${hair}"/><stop offset="1" stop-color="${mix(hair, '#000000', .22)}"/></linearGradient>
-    <radialGradient id="skinG" cx=".5" cy=".42" r=".62"><stop offset="0" stop-color="${mix(skin, '#ffffff', .25)}"/><stop offset=".7" stop-color="${skin}"/><stop offset="1" stop-color="${mix(skin, '#c98a70', .25)}"/></radialGradient>
-    <radialGradient id="lensG"><stop offset="0" stop-color="${mix(lens, '#ffffff', .25)}"/><stop offset=".55" stop-color="${lens}"/><stop offset="1" stop-color="${mix(lens, '#000000', .45)}"/></radialGradient>
-    <linearGradient id="lipG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${mix(lip, '#000000', .1)}"/><stop offset="1" stop-color="${mix(lip, '#ffffff', .12)}"/></linearGradient>
+    <linearGradient id="hairG" gradientUnits="userSpaceOnUse" x1="0" y1="90" x2="0" y2="700"><stop offset="0" stop-color="${mix(hair, '#ffffff', .1)}"/><stop offset=".4" stop-color="${hair}"/><stop offset="1" stop-color="${mix(hair, '#000000', .25)}"/></linearGradient>
+    <radialGradient id="skinG" gradientUnits="userSpaceOnUse" cx="296" cy="330" r="190"><stop offset="0" stop-color="${mix(skin, '#ffffff', .22)}"/><stop offset=".6" stop-color="${skin}"/><stop offset="1" stop-color="${mix(skin, '#b8785e', .3)}"/></radialGradient>
+    <radialGradient id="lensG"><stop offset="0" stop-color="${mix(lens, '#ffffff', .2)}"/><stop offset=".6" stop-color="${lens}"/><stop offset="1" stop-color="${mix(lens, '#000000', .5)}"/></radialGradient>
+    <linearGradient id="lipG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${mix(lip, '#000000', .12)}"/><stop offset="1" stop-color="${mix(lip, '#ffffff', .1)}"/></linearGradient>
     <radialGradient id="pearlG" cx=".35" cy=".3" r=".75"><stop offset="0" stop-color="#ffffff"/><stop offset=".6" stop-color="#f6efe8"/><stop offset="1" stop-color="#d9cfc6"/></radialGradient>
     <clipPath id="eyeClipL"><path d="${EYE_SHAPE}"/></clipPath>
     <clipPath id="faceClip"><path d="${FACE}"/></clipPath>
+    ${hairClips()}
     ${[1, 2, 4, 8, 14].map(b => `<filter id="b${b}" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="${b}"/></filter>`).join('')}
   </defs>
   <rect width="${W}" height="${H}" fill="url(#bgG)"/>`;
-  // 배경 반짝이 · 빛망울
-  for (let i = 0; i < 14; i++) s += `<circle cx="${(i * 137) % W}" cy="${(i * 89 + 40) % H}" r="${10 + (i % 4) * 8}" fill="#fff" opacity=".18" filter="url(#b4)"/>`;
-  for (const [x, y, r] of [[70, 90, 12], [530, 70, 9], [548, 300, 7], [52, 380, 8], [520, 560, 10], [96, 610, 6], [470, 150, 5]]) s += sparkle(x, y, r, '#fff', .9);
+  for (let i = 0; i < 14; i++) s += `<circle cx="${(i * 137) % W}" cy="${(i * 89 + 40) % H}" r="${10 + (i % 4) * 8}" fill="#fff" opacity=".16" filter="url(#b4)"/>`;
+  for (const [x, y, r] of [[70, 90, 12], [530, 70, 9], [548, 300, 7], [52, 380, 8], [520, 560, 10], [96, 610, 6], [470, 150, 5]]) s += sparkle(x, y, r, '#fff', .85);
 
-  s += backHair(hair);
-  // 몸은 조금 올려 목이 길어 보이지 않게
-  // 옷은 위로 올린 만큼 아래 끝을 늘려 바닥까지 채운다
+  s += hairBack(hair);
+  // 몸 · 목
   s += `<g transform="translate(0,-44)">${clothes(skin, shade).replace(/,720(?=[\sZQCLa-z"])/g, ',780')}</g>`;
-  s += `<path d="M272,460 C274,505 270,535 262,560 Q300,574 338,560 C330,535 326,505 328,460Z" fill="${skin}"/><path d="M272,488 Q300,532 328,488 L328,470 L272,470Z" fill="${shade}" opacity=".5" filter="url(#b8)"/>`;
+  s += `<path d="M274,456 C276,505 272,535 264,560 Q300,574 336,560 C328,535 324,505 326,456Z" fill="${skin}"/>`;
+  s += `<path d="M274,480 Q300,524 326,480 L326,460 L274,460Z" fill="${shade}" opacity=".55" filter="url(#b8)"/>`;
   s += `<g transform="translate(0,-44)">${accessories('neck')}</g>`;
-  // 귀
-  s += both(`<path d="M170,322 C154,318 152,350 160,370 C166,386 174,394 180,390 Z" fill="${shade}"/>`);
-  // 얼굴
+  s += both(`<path d="M172,316 C156,312 154,344 162,364 C168,380 176,388 182,384Z" fill="${shade}"/>`);
+  // 얼굴 바탕 · 자연 음영
   s += `<path d="${FACE}" fill="url(#skinG)"/>`;
   s += `<g clip-path="url(#faceClip)">`;
+  s += both(`<ellipse cx="180" cy="330" rx="22" ry="110" fill="${mix(skin, '#9a5a48', .5)}" opacity=".22" filter="url(#b14)"/>`);
+  s += both(`<ellipse cx="282" cy="316" rx="9" ry="14" fill="${mix(skin, '#9a5a48', .5)}" opacity=".22" filter="url(#b4)"/>`);
+  s += `<ellipse cx="300" cy="220" rx="60" ry="30" fill="#fff" opacity=".18" filter="url(#b14)"/>`;
   if (contourOp) {
     const cc = mix(skin, '#7a4a3c', .55);
-    s += `<g fill="${cc}" opacity="${contourOp}" filter="url(#b14)">
-      <ellipse cx="176" cy="250" rx="28" ry="70"/><ellipse cx="424" cy="250" rx="28" ry="70"/>
-      <ellipse cx="196" cy="430" rx="22" ry="62" transform="rotate(-24 196 430)"/><ellipse cx="404" cy="430" rx="22" ry="62" transform="rotate(24 404 430)"/>
-      <ellipse cx="300" cy="530" rx="60" ry="16"/></g>
-      <g fill="${cc}" opacity="${contourOp * .7}" filter="url(#b4)"><ellipse cx="287" cy="362" rx="3.5" ry="24"/><ellipse cx="313" cy="362" rx="3.5" ry="24"/></g>`;
+    s += `<g fill="${cc}" opacity="${contourOp}" filter="url(#b14)">${both('<ellipse cx="182" cy="250" rx="24" ry="60"/><ellipse cx="206" cy="420" rx="18" ry="56" transform="rotate(-26 206 420)"/>')}<ellipse cx="300" cy="514" rx="56" ry="14"/></g>`;
+    s += `<g fill="${cc}" opacity="${contourOp * .7}" filter="url(#b4)"><ellipse cx="288" cy="356" rx="3.5" ry="26"/><ellipse cx="312" cy="356" rx="3.5" ry="26"/></g>`;
   }
-  if (bl) s += `<g fill="${bl}" opacity="${blushOp}" filter="url(#b14)"><ellipse cx="228" cy="398" rx="50" ry="26"/><ellipse cx="372" cy="398" rx="50" ry="26"/></g>`;
-  if (hl) s += `<g fill="${hl}" opacity=".8" filter="url(#b4)"><ellipse cx="300" cy="362" rx="4" ry="20"/><ellipse cx="300" cy="398" rx="6" ry="4.5"/><ellipse cx="300" cy="226" rx="30" ry="20" opacity=".6"/><ellipse cx="300" cy="494" rx="11" ry="6"/><ellipse cx="300" cy="428" rx="7" ry="3"/></g>
-    <g fill="${hl}" opacity=".9" filter="url(#b8)"><ellipse cx="226" cy="376" rx="30" ry="10" transform="rotate(-12 226 376)"/><ellipse cx="374" cy="376" rx="30" ry="10" transform="rotate(12 374 376)"/></g>`;
+  if (bl) s += `<g fill="${bl}" opacity="${blushOp}" filter="url(#b14)">${both('<ellipse cx="238" cy="382" rx="40" ry="20"/>')}</g>`;
+  if (hl) s += `<g fill="${hl}" opacity=".75" filter="url(#b4)"><ellipse cx="300" cy="352" rx="3.5" ry="22"/><ellipse cx="300" cy="392" rx="6" ry="4.5"/><ellipse cx="300" cy="488" rx="10" ry="5"/><ellipse cx="300" cy="428" rx="6" ry="2.5"/></g>
+    <g fill="${hl}" opacity=".85" filter="url(#b8)">${both('<ellipse cx="232" cy="362" rx="26" ry="8" transform="rotate(-10 232 362)"/>')}</g>`;
   if (sh) {
-    s += both(`<g fill="${sh}" opacity=".85" filter="url(#b8)"><ellipse cx="232" cy="318" rx="46" ry="23" transform="rotate(-6 232 318)"/><ellipse cx="200" cy="326" rx="24" ry="17"/></g>`);
-    s += both(`<g fill="${mix(sh, '#000000', .12)}" opacity=".6" filter="url(#b2)"><ellipse cx="216" cy="352" rx="22" ry="5" transform="rotate(16 216 352)"/></g>`);
+    s += both(`<g fill="${sh}" opacity=".8" filter="url(#b8)"><ellipse cx="246" cy="320" rx="34" ry="13" transform="rotate(-4 246 320)"/><ellipse cx="222" cy="326" rx="16" ry="10"/></g>`);
+    s += both(`<g fill="${mix(sh, '#000000', .12)}" opacity=".55" filter="url(#b2)"><ellipse cx="226" cy="341" rx="14" ry="3.5" transform="rotate(14 226 341)"/></g>`);
   }
   s += `</g>`;
-  // 코
-  s += `<path d="M291,394 Q294,399 298,398 M309,394 Q306,399 302,398" stroke="${mix(skin, '#8a4a3e', .5)}" stroke-width="2" fill="none" stroke-linecap="round" opacity=".55" filter="url(#b1)"/>`;
-  s += `<path d="M288,388 Q300,404 312,388" stroke="${mix(skin, '#9a5a4a', .4)}" stroke-width="3" fill="none" opacity=".25" filter="url(#b2)"/>`;
-  // 눈썹 · 눈 · 입술
+  s += nose(skin);
   s += both(browLeft());
-  s += both(`<g transform="translate(237,336) scale(1.14) translate(-237,-336)">${eyeLeft()}</g>`);
-  s += `<g transform="translate(0,-20)">${lips()}</g>`;
+  s += both(`<g transform="translate(244,330) scale(1.12) translate(-244,-330)">${eyeLeft()}</g>`);
+  s += lips();
   s += accessories('face');
-  s += frontHair(hair);
+  s += hairFront(hair);
   s += accessories('ear');
   s += accessories('head');
   return s + '</svg>';
