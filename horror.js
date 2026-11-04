@@ -1,4 +1,4 @@
-import { initGamePage, showResult, setupCanvas, canvasPoint } from './common.js?v=18';
+import { initGamePage, showResult, setupCanvas, canvasPoint } from './common.js?v=19';
 
 initGamePage('horror');
 
@@ -21,7 +21,10 @@ let state = 'ready';   // ready → play → caught → done
 let map, player, ghosts, keysLeft, got, batteries, exit, battery, lightOn, t0, now0, last, aim, mouseAt, scareAt, pathT, distP, msg, msgAt, flick;
 // 숨기: 사물함 안에서는 숨(breath)이 줄고, 다 떨어지면 저절로 나온다
 const BREATH_DRAIN = 20, BREATH_GAIN = 9, BREATH_MIN = 35, WANDER_AFTER = 2600;
-let lockers, hidden, breath, wanderUntil, lightBefore;
+let lockers, hidden, breath, wanderUntil, lightBefore, graceUntil = 0;
+const SEE_R = 90, GRACE = 1000;   // 이 거리 안에서 보고 있으면 숨는 걸 들킨다 · 나온 직후 무적 시간
+// 지금 숨으면 들킬 유령들
+const watchers = () => ghosts.filter(g => Math.hypot(g.x - player.x, g.y - player.y) < SEE_R && !g.lit && clearLine(g.x, g.y, player.x, player.y));
 const keys = {};
 
 /* ---------- 지도 ---------- */
@@ -58,6 +61,7 @@ function genMap() {
 }
 function bfs(g, sx, sy) {
   const d = Array.from({ length: ROWS }, () => Array(COLS).fill(-1));
+  sx = Math.max(0, Math.min(COLS - 1, sx)); sy = Math.max(0, Math.min(ROWS - 1, sy));
   const q = [[sx, sy]]; d[sy][sx] = 0;
   for (let h = 0; h < q.length; h++) {
     const [x, y] = q[h];
@@ -225,7 +229,7 @@ function update(now) {
     nearest = Math.min(nearest, d);
     g.lit = isLit(g.x, g.y);
     // 숨는 걸 들킨 유령은 사물함까지 와서 끌어낸다
-    if (d < 24 && (!hidden || g.saw)) return caught(now);
+    if (d < 24 && (!hidden || g.saw) && now > graceUntil) return caught(now);
     if (g.lit) continue;
     const speed = G_SPEED * (1 + got * .06);
     let field = distP;
@@ -286,6 +290,7 @@ function hide(now) {
   const l = nearLocker();
   if (!l) return;
   if (breath < BREATH_MIN) { say('💨 숨이 차서 아직 못 숨어요'); return; }
+  const watching = watchers();
   hidden = l;
   const c = center(l.tx, l.ty); player.x = c.x; player.y = c.y;
   lightBefore = lightOn; lightOn = false;
@@ -293,7 +298,7 @@ function hide(now) {
   // 가까이서 보고 있던 유령은 속지 않는다
   let seen = 0;
   for (const g of ghosts) {
-    g.saw = Math.hypot(g.x - player.x, g.y - player.y) < 120 && clearLine(g.x, g.y, player.x, player.y) && !g.lit;
+    g.saw = watching.includes(g);
     if (g.saw) seen++;
     g.wander = null; g.tgt = null;
   }
@@ -304,6 +309,7 @@ function unhide(now) {
   if (!hidden) return;
   hidden = null; lightOn = lightBefore;
   wanderUntil = now + WANDER_AFTER;
+  graceUntil = now + GRACE;
   for (const g of ghosts) g.saw = false;
   blip(220, .15, 'square', .08);
 }
@@ -469,11 +475,12 @@ function drawHUD(now, cx, cy) {
   const nl = !hidden && nearLocker();
   if (nl) {
     const lx = nl.tx * T - cx + T / 2, ly = nl.ty * T - cy - 10;
-    const txt = breath < BREATH_MIN ? '💨 숨 고르는 중…' : 'E  숨기';
+    const watched = breath >= BREATH_MIN && watchers().length > 0;
+    const txt = breath < BREATH_MIN ? '💨 숨 고르는 중…' : watched ? '⚠️ 유령이 보고 있어요' : 'E  숨기';
     ctx.textAlign = 'center'; ctx.font = '800 13px Pretendard, sans-serif';
     const w = ctx.measureText(txt).width + 16;
     ctx.fillStyle = 'rgba(0,0,0,.7)'; ctx.fillRect(lx - w / 2, ly - 11, w, 22);
-    ctx.fillStyle = breath < BREATH_MIN ? '#ff9a7a' : '#ffe9a8'; ctx.fillText(txt, lx, ly);
+    ctx.fillStyle = breath < BREATH_MIN ? '#ff9a7a' : watched ? '#ff5c5c' : '#ffe9a8'; ctx.fillText(txt, lx, ly);
     ctx.textAlign = 'left';
   }
   ctx.textAlign = 'right'; ctx.font = '800 16px Pretendard, sans-serif'; ctx.fillStyle = '#ddd';
@@ -548,7 +555,10 @@ function drawHidden(now) {
   ctx.fillStyle = `rgba(0,0,0,${.15 + .1 * Math.sin(now / (200 + 400 * k))})`; ctx.fillRect(0, 0, VW, VH);
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.font = '800 16px Pretendard, sans-serif'; ctx.fillStyle = '#c9c2b8';
-  ctx.fillText('사물함 안에 숨어 있어요 · E로 나가기', VW / 2, VH / 2 + 86);
+  const spotted = ghosts.some(g => g.saw);
+  if (spotted && Math.floor(now / 300) % 2) { ctx.fillStyle = '#ff5c5c'; ctx.font = '900 20px Pretendard, sans-serif'; }
+  ctx.fillText(spotted ? '😱 들켰어요! E로 나가서 도망치세요' : '사물함 안에 숨어 있어요 · E로 나가기', VW / 2, VH / 2 + 86);
+  ctx.font = '800 16px Pretendard, sans-serif';
   ctx.fillStyle = '#222'; ctx.fillRect(VW / 2 - 120, VH / 2 + 106, 240, 12);
   ctx.fillStyle = k < .3 ? '#ff6a5c' : '#8fd3ff'; ctx.fillRect(VW / 2 - 118, VH / 2 + 108, 236 * k, 8);
   ctx.font = '700 12px Pretendard, sans-serif'; ctx.fillStyle = '#8a857e';
