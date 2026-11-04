@@ -1,4 +1,4 @@
-import { initGamePage, showResult, setupCanvas, canvasPoint } from './common.js?v=19';
+import { initGamePage, showResult, setupCanvas, canvasPoint } from './common.js?v=20';
 
 initGamePage('horror');
 
@@ -20,11 +20,9 @@ let seen;   // 한 번 본 칸은 어둡게라도 계속 보인다
 let state = 'ready';   // ready → play → caught → done
 let map, player, ghosts, keysLeft, got, batteries, exit, battery, lightOn, t0, now0, last, aim, mouseAt, scareAt, pathT, distP, msg, msgAt, flick;
 // 숨기: 사물함 안에서는 숨(breath)이 줄고, 다 떨어지면 저절로 나온다
-const BREATH_DRAIN = 20, BREATH_GAIN = 9, BREATH_MIN = 35, WANDER_AFTER = 2600;
+const BREATH_DRAIN = 100 / 3, BREATH_GAIN = 9, BREATH_MIN = 35, WANDER_AFTER = 2600;   // 최대 3초 숨기
 let lockers, hidden, breath, wanderUntil, lightBefore, graceUntil = 0;
-const SEE_R = 90, GRACE = 1000;   // 이 거리 안에서 보고 있으면 숨는 걸 들킨다 · 나온 직후 무적 시간
-// 지금 숨으면 들킬 유령들
-const watchers = () => ghosts.filter(g => Math.hypot(g.x - player.x, g.y - player.y) < SEE_R && !g.lit && clearLine(g.x, g.y, player.x, player.y));
+const GRACE = 1000;   // 사물함에서 나온 직후 잡히지 않는 시간
 const keys = {};
 
 /* ---------- 지도 ---------- */
@@ -229,14 +227,17 @@ function update(now) {
     nearest = Math.min(nearest, d);
     g.lit = isLit(g.x, g.y);
     // 숨는 걸 들킨 유령은 사물함까지 와서 끌어낸다
-    if (d < 24 && (!hidden || g.saw) && now > graceUntil) return caught(now);
+    // 사물함 안은 무조건 안전, 나온 직후 잠깐도 안전
+    if (d < 24 && !hidden && now > graceUntil) return caught(now);
     if (g.lit) continue;
     const speed = G_SPEED * (1 + got * .06);
-    let field = distP;
-    if (lost && !g.saw) {
+    let field = distP, flee = false;
+    if (lost) {
       // 나와 먼 곳으로 떠돈다: 목적지까지의 거리표를 따라 내려간다
       const [gtx, gty] = tileOf(g);
-      if (!g.wander || (gtx === g.wander.tx && gty === g.wander.ty)) {
+      // 사물함 가까이(4칸 안)면 일단 나에게서 곧장 멀어진다 = 사물함 앞을 지키지 않는다
+      flee = (distP[gty]?.[gtx] ?? 99) < 4;
+      if (!flee && (!g.wander || (gtx === g.wander.tx && gty === g.wander.ty))) {
         // 유령에게는 가깝고 나에게서는 먼 곳 = 나를 지나치지 않고 반대쪽으로 가는 곳
         // (나와의 거리 - 유령과의 거리)가 지금 나와의 거리와 비슷하면, 가는 길 내내 나에게서 멀어진다
         const fromG = bfs(map, gtx, gty), dpG = Math.max(0, distP[gty]?.[gtx] ?? 0), cand = [], loose = [];
@@ -252,7 +253,7 @@ function update(now) {
         g.wander = { tx: wx, ty: wy, field: bfs(map, wx, wy) };
         g.tgt = null;
       }
-      field = g.wander.field;
+      if (g.wander) field = g.wander.field;
     } else {
       if (g.wander) { g.wander = null; g.tgt = null; }
       // 바로 보이면 곧장 다가온다
@@ -261,16 +262,25 @@ function update(now) {
       }
     }
     const [gtx, gty] = tileOf(g);
+    if (flee && g.tgt && (distP[Math.floor(g.tgt.y / T)]?.[Math.floor(g.tgt.x / T)] ?? 0) < (distP[gty]?.[gtx] ?? 0)) g.tgt = null;
     if (!g.tgt || (Math.abs(g.x - g.tgt.x) < 3 && Math.abs(g.y - g.tgt.y) < 3)) {
-      let best = null, bd = field[gty]?.[gtx] ?? 999;
-      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-        const v = field[gty + dy]?.[gtx + dx];
-        if (v >= 0 && v < bd) { bd = v; best = [gtx + dx, gty + dy]; }
+      let best = null;
+      if (flee) {
+        // 나와의 거리가 가장 커지는 옆 칸으로
+        let bd = distP[gty]?.[gtx] ?? 0;
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const v = distP[gty + dy]?.[gtx + dx]; if (v > bd) { bd = v; best = [gtx + dx, gty + dy]; } }
+        if (!best) g.wander = null;
+      } else {
+        let bd = field[gty]?.[gtx] ?? 999;
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const v = field[gty + dy]?.[gtx + dx];
+          if (v >= 0 && v < bd) { bd = v; best = [gtx + dx, gty + dy]; }
+        }
       }
       g.tgt = best ? center(best[0], best[1]) : center(gtx, gty);
     }
     const dx = g.tgt.x - g.x, dy = g.tgt.y - g.y, l = Math.hypot(dx, dy) || 1;
-    const sp = Math.min(l, (lost && !g.saw ? speed * .8 : speed) * dt);
+    const sp = Math.min(l, (flee ? speed * 1.1 : lost ? speed * .85 : speed) * dt);
     g.x += dx / l * sp; g.y += dy / l * sp;
   }
   // 긴장감: 가까울수록 심장 소리 빨라지고 손전등이 떨린다
@@ -290,27 +300,20 @@ function hide(now) {
   const l = nearLocker();
   if (!l) return;
   if (breath < BREATH_MIN) { say('💨 숨이 차서 아직 못 숨어요'); return; }
-  const watching = watchers();
   hidden = l;
   const c = center(l.tx, l.ty); player.x = c.x; player.y = c.y;
   lightBefore = lightOn; lightOn = false;
   distP = null;   // 유령이 떠날 방향을 지금 내 위치 기준으로 다시 계산
-  // 가까이서 보고 있던 유령은 속지 않는다
-  let seen = 0;
-  for (const g of ghosts) {
-    g.saw = watching.includes(g);
-    if (g.saw) seen++;
-    g.wander = null; g.tgt = null;
-  }
+  // 사물함 안은 안전: 유령은 모두 나를 놓치고 다른 곳으로 간다
+  for (const g of ghosts) { g.wander = null; g.tgt = null; }
   blip(180, .18, 'square', .08);
-  say(seen ? '😱 들켰어요! 유령이 보고 있었어요' : '🤫 숨었어요… 숨이 다 떨어지기 전에 나가세요');
+  say('🤫 숨었어요… 3초 안에 나가야 해요');
 }
 function unhide(now) {
   if (!hidden) return;
   hidden = null; lightOn = lightBefore;
   wanderUntil = now + WANDER_AFTER;
   graceUntil = now + GRACE;
-  for (const g of ghosts) g.saw = false;
   blip(220, .15, 'square', .08);
 }
 
@@ -475,12 +478,11 @@ function drawHUD(now, cx, cy) {
   const nl = !hidden && nearLocker();
   if (nl) {
     const lx = nl.tx * T - cx + T / 2, ly = nl.ty * T - cy - 10;
-    const watched = breath >= BREATH_MIN && watchers().length > 0;
-    const txt = breath < BREATH_MIN ? '💨 숨 고르는 중…' : watched ? '⚠️ 유령이 보고 있어요' : 'E  숨기';
+    const txt = breath < BREATH_MIN ? '💨 숨 고르는 중…' : 'E  숨기';
     ctx.textAlign = 'center'; ctx.font = '800 13px Pretendard, sans-serif';
     const w = ctx.measureText(txt).width + 16;
     ctx.fillStyle = 'rgba(0,0,0,.7)'; ctx.fillRect(lx - w / 2, ly - 11, w, 22);
-    ctx.fillStyle = breath < BREATH_MIN ? '#ff9a7a' : watched ? '#ff5c5c' : '#ffe9a8'; ctx.fillText(txt, lx, ly);
+    ctx.fillStyle = breath < BREATH_MIN ? '#ff9a7a' : '#ffe9a8'; ctx.fillText(txt, lx, ly);
     ctx.textAlign = 'left';
   }
   ctx.textAlign = 'right'; ctx.font = '800 16px Pretendard, sans-serif'; ctx.fillStyle = '#ddd';
@@ -555,10 +557,7 @@ function drawHidden(now) {
   ctx.fillStyle = `rgba(0,0,0,${.15 + .1 * Math.sin(now / (200 + 400 * k))})`; ctx.fillRect(0, 0, VW, VH);
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.font = '800 16px Pretendard, sans-serif'; ctx.fillStyle = '#c9c2b8';
-  const spotted = ghosts.some(g => g.saw);
-  if (spotted && Math.floor(now / 300) % 2) { ctx.fillStyle = '#ff5c5c'; ctx.font = '900 20px Pretendard, sans-serif'; }
-  ctx.fillText(spotted ? '😱 들켰어요! E로 나가서 도망치세요' : '사물함 안에 숨어 있어요 · E로 나가기', VW / 2, VH / 2 + 86);
-  ctx.font = '800 16px Pretendard, sans-serif';
+  ctx.fillText('사물함 안은 안전해요 · E로 나가기', VW / 2, VH / 2 + 86);
   ctx.fillStyle = '#222'; ctx.fillRect(VW / 2 - 120, VH / 2 + 106, 240, 12);
   ctx.fillStyle = k < .3 ? '#ff6a5c' : '#8fd3ff'; ctx.fillRect(VW / 2 - 118, VH / 2 + 108, 236 * k, 8);
   ctx.font = '700 12px Pretendard, sans-serif'; ctx.fillStyle = '#8a857e';
