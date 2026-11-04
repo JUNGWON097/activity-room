@@ -1,4 +1,4 @@
-import { initGamePage, showResult, setupCanvas, canvasPoint } from './common.js?v=13';
+import { initGamePage, showResult, setupCanvas, canvasPoint } from './common.js?v=14';
 
 initGamePage('omok');
 
@@ -36,6 +36,35 @@ function fiveFrom(x, y, c) {
   }
   return null;
 }
+/* ---------- 쌍삼(3·3) 금지 ---------- */
+// (x,y)를 지나는 dx,dy 방향에 '열린 3'이 생기는지: 빈칸 하나를 더 채우면 양쪽이 빈 4가 되는가
+function openThreeDir(x, y, dx, dy, c) {
+  for (let k = -4; k <= 4; k++) {
+    if (!k) continue;
+    const ex = x + dx * k, ey = y + dy * k;
+    if (!inside(ex, ey) || board[ey][ex]) continue;
+    board[ey][ex] = c;
+    let a = 0, b = 0;
+    while (inside(ex - dx * (a + 1), ey - dy * (a + 1)) && board[ey - dy * (a + 1)][ex - dx * (a + 1)] === c) a++;
+    while (inside(ex + dx * (b + 1), ey + dy * (b + 1)) && board[ey + dy * (b + 1)][ex + dx * (b + 1)] === c) b++;
+    board[ey][ex] = 0;
+    // 정확히 4개가 이어지고, 그 4개 안에 (x,y)가 있고, 양 끝이 비어 있어야 한다
+    if (a + b + 1 !== 4 || -k < -a || -k > b) continue;
+    const s1x = ex - dx * (a + 1), s1y = ey - dy * (a + 1), s2x = ex + dx * (b + 1), s2y = ey + dy * (b + 1);
+    if (inside(s1x, s1y) && !board[s1y][s1x] && inside(s2x, s2y) && !board[s2y][s2x]) return true;
+  }
+  return false;
+}
+function isDoubleThree(x, y, c) {
+  if (board[y][x]) return false;
+  board[y][x] = c;
+  let n = 0;
+  if (!fiveFrom(x, y, c)) for (const [dx, dy] of DIRS) if (openThreeDir(x, y, dx, dy, c)) n++;
+  board[y][x] = 0;
+  return n >= 2;
+}
+let warnAt = 0;
+
 function put(x, y, c, now) {
   board[y][x] = c; moves++; lastMove = { x, y, t: now };
   if (c === ME) myCount++;
@@ -82,7 +111,7 @@ function aiMove() {
     let near = false;
     for (let j = -2; j <= 2 && !near; j++) for (let i = -2; i <= 2; i++)
       if (inside(x + i, y + j) && board[y + j][x + i]) { near = true; break; }
-    if (!near) continue;
+    if (!near || isDoubleThree(x, y, AI)) continue;
     const atk = evalCell(x, y, AI);
     let def = evalCell(x, y, ME);
     if (def < WIN_VAL[5]) def *= careless ? .15 : .7;
@@ -106,6 +135,7 @@ cv.addEventListener('pointerdown', e => {
   if (e.button !== 0 || state !== 'me') return;
   const c = cellAt(canvasPoint(cv, W, e));
   if (!c || board[c.y][c.x]) return;
+  if (isDoubleThree(c.x, c.y, ME)) { warnAt = performance.now(); return; }
   put(c.x, c.y, ME, performance.now());
 });
 
@@ -129,7 +159,9 @@ function draw(now) {
   // 상태 띠
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.font = '800 17px Pretendard, sans-serif'; ctx.fillStyle = INK;
-  const msg = { ready: '흑돌(나)부터 시작해요', me: `내 차례 · 흑돌 ${myCount}개`, ai: '컴퓨터가 생각 중…', won: '내가 이겼어요! 🎉', lost: '컴퓨터가 이겼어요', draw: '비겼어요', done: '' }[state];
+  const warn = now - warnAt < 1500;
+  if (warn) ctx.fillStyle = '#ff5c7a';
+  const msg = warn && state === 'me' ? '쌍삼(3·3)은 둘 수 없어요 🙅' : { ready: '흑돌(나)부터 시작해요', me: `내 차례 · 흑돌 ${myCount}개`, ai: '컴퓨터가 생각 중…', won: '내가 이겼어요! 🎉', lost: '컴퓨터가 이겼어요', draw: '비겼어요', done: '' }[state];
   ctx.fillText(msg, W / 2, TOP / 2 + 2);
 
   // 판
@@ -153,7 +185,14 @@ function draw(now) {
     ctx.fillStyle = '#ff5c7a';
     ctx.beginPath(); ctx.arc(px(lastMove.x), py(lastMove.y), 4, 0, Math.PI * 2); ctx.fill();
   }
-  if (state === 'me' && hover && !board[hover.y][hover.x]) stone(px(hover.x), py(hover.y), ME, .4);
+  if (state === 'me' && hover && !board[hover.y][hover.x]) {
+    if (isDoubleThree(hover.x, hover.y, ME)) {
+      // 쌍삼 자리: 빨간 ✕
+      const x = px(hover.x), y = py(hover.y), r = GAP * .26;
+      ctx.strokeStyle = '#ff5c7a'; ctx.lineWidth = 3.5; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(x - r, y - r); ctx.lineTo(x + r, y + r); ctx.moveTo(x + r, y - r); ctx.lineTo(x - r, y + r); ctx.stroke();
+    } else stone(px(hover.x), py(hover.y), ME, .4);
+  }
   if (winLine) {
     const pulse = .6 + .4 * Math.sin(now / 120);
     ctx.strokeStyle = `rgba(255,92,122,${pulse})`; ctx.lineWidth = 4;
