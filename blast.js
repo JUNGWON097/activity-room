@@ -1,4 +1,4 @@
-import { initGamePage, showResult, setupCanvas, canvasPoint } from './common.js?v=22';
+import { initGamePage, showResult, setupCanvas, canvasPoint } from './common.js?v=23';
 
 initGamePage('blast');
 
@@ -50,11 +50,46 @@ function fitsAnywhere(p) {
   for (let r = 0; r <= N - p.h; r++) for (let c = 0; c <= N - p.w; c++) if (fits(p, c, r)) return true;
   return false;
 }
+/* ---------- 세 블록을 모두 놓을 수 있는지 ---------- */
+// 판을 줄마다 8비트 숫자로 바꿔, 놓는 순서 · 자리를 모두 따져 본다(줄이 터지는 것까지)
+const FULL = (1 << N) - 1;
+const toRows = g => g.map(r => r.reduce((m, c, i) => (c ? m | (1 << i) : m), 0));
+function pieceMask(p) { const rows = Array(p.h).fill(0); for (const [x, y] of p.cells) rows[y] |= 1 << x; return rows; }
+function clearFull(b) {
+  let colFull = FULL;
+  for (const r of b) colFull &= r;
+  return b.map(r => (r === FULL ? 0 : r & ~colFull));
+}
+function canPlaceAll(b, ps, budget) {
+  if (!ps.length) return true;
+  for (let i = 0; i < ps.length; i++) {
+    const { rows, w, h } = ps[i], rest = ps.filter((_, j) => j !== i);
+    for (let r = 0; r <= N - h; r++) for (let c = 0; c <= N - w; c++) {
+      if (--budget.n < 0) return false;
+      let ok = true;
+      for (let k = 0; k < h; k++) if (b[r + k] & (rows[k] << c)) { ok = false; break; }
+      if (!ok) continue;
+      const nb = b.slice();
+      for (let k = 0; k < h; k++) nb[r + k] |= rows[k] << c;
+      if (canPlaceAll(clearFull(nb), rest, budget)) return true;
+    }
+  }
+  return false;
+}
+function solvable(set) {
+  const ps = set.map(p => ({ rows: pieceMask(p), w: p.w, h: p.h }));
+  return canPlaceAll(toRows(grid), ps, { n: 60000 });
+}
 function newTray() {
-  // 셋 중 하나는 놓을 수 있게 몇 번 다시 뽑아 본다
-  for (let i = 0; i < 30; i++) {
+  // 세 개 모두 놓을 수 있는 순서가 있는 세트만 준다
+  for (let i = 0; i < 60; i++) {
     tray = [makePiece(), makePiece(), makePiece()];
-    if (tray.some(fitsAnywhere)) break;
+    if (solvable(tray)) return;
+  }
+  // 판이 많이 찼으면 작은 블록(1~3칸)으로 다시 찾아본다
+  for (let i = 0; i < 60; i++) {
+    tray = [0, 1, 2].map(() => { let p; do { p = makePiece(); } while (p.cells.length > 3); return p; });
+    if (solvable(tray)) return;
   }
 }
 function start() {
