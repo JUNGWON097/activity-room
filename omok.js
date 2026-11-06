@@ -1,4 +1,4 @@
-import { initGamePage, showResult, setupCanvas, canvasPoint } from './common.js?v=20';
+import { initGamePage, showResult, setupCanvas, canvasPoint } from './common.js?v=21';
 
 initGamePage('omok');
 
@@ -64,6 +64,34 @@ function isDoubleThree(x, y, c) {
   board[y][x] = 0;
   return n >= 2;
 }
+/* ---------- 4·3 금지(컴퓨터만) ---------- */
+// (x,y)를 지나는 방향에 '4'가 있는지: 빈칸 하나만 더 채우면 (x,y)를 포함해 5개 이상이 되는가
+function fourDir(x, y, dx, dy, c) {
+  for (let k = -4; k <= 4; k++) {
+    if (!k) continue;
+    const ex = x + dx * k, ey = y + dy * k;
+    if (!inside(ex, ey) || board[ey][ex]) continue;
+    board[ey][ex] = c;
+    let a = 0, b = 0;
+    while (inside(ex - dx * (a + 1), ey - dy * (a + 1)) && board[ey - dy * (a + 1)][ex - dx * (a + 1)] === c) a++;
+    while (inside(ex + dx * (b + 1), ey + dy * (b + 1)) && board[ey + dy * (b + 1)][ex + dx * (b + 1)] === c) b++;
+    board[ey][ex] = 0;
+    if (a + b + 1 >= 5 && -k >= -a && -k <= b) return true;
+  }
+  return false;
+}
+// 한 수로 4와 열린 3을 서로 다른 방향에 동시에 만드는가(바로 5가 되는 수는 제외)
+function isFourThree(x, y, c) {
+  if (board[y][x]) return false;
+  board[y][x] = c;
+  let fours = 0, threes = 0;
+  if (!fiveFrom(x, y, c)) for (const [dx, dy] of DIRS) {
+    if (fourDir(x, y, dx, dy, c)) fours++;
+    else if (openThreeDir(x, y, dx, dy, c)) threes++;
+  }
+  board[y][x] = 0;
+  return fours >= 1 && threes >= 1;
+}
 
 function put(x, y, c, now) {
   board[y][x] = c; moves++; lastMove = { x, y, t: now };
@@ -112,7 +140,8 @@ function aiMove() {
     let near = false;
     for (let j = -2; j <= 2 && !near; j++) for (let i = -2; i <= 2; i++)
       if (inside(x + i, y + j) && board[y + j][x + i]) { near = true; break; }
-    if (!near || isDoubleThree(x, y, AI)) continue;
+    // 컴퓨터는 쌍삼(3·3)과 4·3을 둘 수 없다
+    if (!near || isDoubleThree(x, y, AI) || isFourThree(x, y, AI)) continue;
     let atk = evalCell(x, y, AI);
     if (atk < WIN_VAL[5]) atk *= .55;   // 공격도 덜 적극적으로(5목 완성은 그대로)
     let def = evalCell(x, y, ME);
@@ -121,7 +150,9 @@ function aiMove() {
     const v = atk + def + Math.random() * 160;
     if (v > bestV) { bestV = v; best = [x, y]; }
   }
-  if (!best) best = [7, 7];
+  // 둘 곳이 모두 금지된 드문 경우: 아무 빈칸이나
+  if (!best) for (let y = 0; y < N && !best; y++) for (let x = 0; x < N; x++) if (!board[y][x]) { best = [x, y]; break; }
+  if (!best) return end('draw');
   put(best[0], best[1], AI, performance.now());
 }
 

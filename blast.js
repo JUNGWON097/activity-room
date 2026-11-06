@@ -1,4 +1,4 @@
-import { initGamePage, showResult, setupCanvas, canvasPoint } from './common.js?v=20';
+import { initGamePage, showResult, setupCanvas, canvasPoint } from './common.js?v=21';
 
 initGamePage('blast');
 
