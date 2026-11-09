@@ -318,8 +318,9 @@ export function setupCanvas(canvas, w, h) {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   return ctx;
 }
+// 화면에 보이는 크기가 원래 비율과 달라도 맞도록 가로 · 세로를 따로 계산한다
 export function canvasPoint(canvas, w, e) {
   const r = canvas.getBoundingClientRect();
-  const k = w / r.width;
-  return { x: (e.clientX - r.left) * k, y: (e.clientY - r.top) * k };
+  const h = w * canvas.height / canvas.width;
+  return { x: (e.clientX - r.left) * w / r.width, y: (e.clientY - r.top) * h / r.height };
 }

@@ -126,7 +126,8 @@ kbd {
 .stage.cute { background: #fde3ef; border-color: #f6c6dc; }
 .stage.cute .veil { background: rgba(120,80,130,.55); }
 .stage.cute.sky { background: #dff1ff; border-color: #c4e2fb; }
-.stage.portrait canvas { width: auto; max-width: 100%; height: min(74vh, 640px); margin: 0 auto; }
+/* 세로형 게임판: 비율을 지킨 채 화면 폭 · 높이 안에 맞춘다(폰에서 늘어나 보이지 않게) */
+.stage.portrait canvas { width: auto; height: auto; max-width: 100%; max-height: min(74vh, 640px); margin: 0 auto; }
 .how { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 20px; }
 .how h3 { margin: 14px 0 6px; font-size: 14px; color: var(--accent); }
 .how h3:first-child { margin-top: 0; }
