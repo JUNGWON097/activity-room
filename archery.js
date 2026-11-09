@@ -1,13 +1,14 @@
-import { initGamePage, showResult, setupCanvas, canvasPoint } from './common.js?v=26';
+import { initGamePage, showResult, setupCanvas, canvasPoint, IS_MOBILE } from './common.js?v=27';
 
 initGamePage('archery');
 
-const W = 720, H = 480;
+// 휴대폰은 세로로 긴 화면. 과녁 크기 · 바람은 PC와 같아서 난이도는 똑같다
+const W = IS_MOBILE ? 480 : 720, H = IS_MOBILE ? 720 : 480;
 const cv = document.getElementById('cv');
 const ctx = setupCanvas(cv, W, H);
 const veil = document.getElementById('veil');
 
-const CX = W / 2, CY = 262, R = 180, RING = R / 10;
+const CX = W / 2, CY = IS_MOBILE ? 330 : 262, R = 180, RING = R / 10;
 const SHOTS = 6, FULL_DRAW = 850;
 // 발마다 난이도가 오른다: 최대 바람(m/s) · 당기는 중 떨림(px) · 다 당긴 뒤 버틸 때 떨림 증가(px/초)
 const LEVELS = [
@@ -177,7 +178,7 @@ function drawHud(t) {
     ctx.fillStyle = p >= 1 ? '#3fd0c0' : '#ffc83d';
     if (p > 0) { roundRect(bx, by, bw * p, 12, 6); ctx.fill(); }
     ctx.fillStyle = 'rgba(255,255,255,.8)'; ctx.font = '600 13px Pretendard, sans-serif';
-    ctx.fillText(holding ? (p >= 1 ? '지금 놓기!' : '당기는 중… 계속 누르고 있기') : '마우스를 꾹 누르고 있으면 활을 당겨요', CX, by - 12);
+    ctx.fillText(holding ? (p >= 1 ? '지금 놓기!' : '당기는 중… 계속 누르고 있기') : IS_MOBILE ? '화면을 꾹 누르고 있으면 활을 당겨요' : '마우스를 꾹 누르고 있으면 활을 당겨요', CX, by - 12);
   }
 }
 function roundRect(x, y, w, h, r) {

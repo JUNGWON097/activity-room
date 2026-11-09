@@ -1,4 +1,4 @@
-import { initGamePage, showResult, setupCanvas, canvasPoint } from './common.js?v=26';
+import { initGamePage, showResult, setupCanvas, canvasPoint } from './common.js?v=27';
 
 initGamePage('omok');
 
