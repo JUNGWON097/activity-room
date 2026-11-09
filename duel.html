@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>석양의 결투 · 액티비티룸</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
-<link rel="stylesheet" href="style.css?v=24">
+<link rel="stylesheet" href="style.css?v=25">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤠</text></svg>">
 <style>
   .duel {
@@ -29,6 +29,12 @@
   .rounds span { min-width: 74px; padding: 5px 10px; border-radius: 10px; background: rgba(0,0,0,.28); color: #fff; font-weight: 700; font-size: 14px; font-variant-numeric: tabular-nums; }
   .rounds span.bad { background: rgba(60,60,80,.8); color: #ffb3c0; }
   .rounds span.now { outline: 2px solid #fff; }
+  /* 좁은 화면(휴대폰)에서 5판 표시가 잘리지 않게 */
+  @media (max-width: 600px) {
+    .rounds { top: 10px; gap: 4px; padding: 0 6px; }
+    .rounds span { min-width: 0; flex: 1; max-width: 72px; padding: 4px 2px; font-size: 11px; text-align: center; }
+    .duel .cowboy { font-size: 44px; }
+  }
 </style>
 </head>
 <body>
@@ -45,6 +51,6 @@
   </section>
   <aside class="board-panel"><h2>🏆 랭킹</h2><div id="board"></div></aside>
 </main>
-<script type="module" src="duel.js?v=24"></script>
+<script type="module" src="duel.js?v=25"></script>
 </body>
 </html>

@@ -134,8 +134,11 @@ const TOUCH = {
 };
 for (const [id, keys] of Object.entries(TOUCH)) { GAMES[id].mobile = true; GAMES[id].touchKeys = keys; }
 export const GAME_IDS = Object.keys(GAMES);
-// 마우스 없이 손가락만 쓰는 기기(휴대폰 · 태블릿)
-export const IS_MOBILE = window.matchMedia('(pointer: coarse)').matches && !window.matchMedia('(any-pointer: fine)').matches;
+// 휴대폰 · 태블릿: 기본 입력이 손가락이거나(갤럭시 S펜처럼 펜이 있어도 기본은 손가락), 휴대기기 브라우저
+const UA = navigator.userAgent || '';
+export const IS_MOBILE = /Android|iPhone|iPad|iPod|Mobile/i.test(UA)
+  || (/Macintosh/.test(UA) && navigator.maxTouchPoints > 1)   // 데스크톱처럼 보이는 아이패드
+  || (window.matchMedia('(pointer: coarse)').matches && !window.matchMedia('(hover: hover)').matches);
 export const VISIBLE_IDS = IS_MOBILE ? GAME_IDS.filter(id => GAMES[id].mobile) : GAME_IDS;
 
 export function esc(s) {
