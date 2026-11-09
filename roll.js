@@ -1,4 +1,4 @@
-import { initGamePage, showResult, setupCanvas, canvasPoint } from './common.js?v=23';
+import { initGamePage, showResult, setupCanvas, canvasPoint } from './common.js?v=24';
 
 initGamePage('roll');
 
@@ -235,5 +235,8 @@ document.addEventListener('keydown', e => {
   if (e.code === 'Space') { e.preventDefault(); if (state === 'ready') start(); }
 });
 // 캔버스 바깥(양옆 여백)에서도 마우스를 따라가도록 무대 전체에서 받는다. 무대를 벗어나면 마지막 자리에 머문다
-stage.addEventListener('pointermove', e => { const p = canvasPoint(cv, W, e); target = { x: Math.max(0, Math.min(W, p.x)), y: p.y }; });
+// 손가락이면 공이 손가락에 가리지 않게 조금 위를 따라간다
+const TOUCH_UP = 80;
+stage.addEventListener('pointermove', e => { const p = canvasPoint(cv, W, e); target = { x: Math.max(0, Math.min(W, p.x)), y: p.y - (e.pointerType === 'touch' ? TOUCH_UP : 0) }; });
+stage.addEventListener('pointerdown', e => { if (e.pointerType !== 'touch' || state !== 'play') return; const p = canvasPoint(cv, W, e); target = { x: Math.max(0, Math.min(W, p.x)), y: p.y - TOUCH_UP }; });
 veil.addEventListener('click', e => { const p = canvasPoint(cv, W, e); start(); target = { x: Math.max(0, Math.min(W, p.x)), y: Math.max(Y_MIN, Math.min(Y_MAX, p.y)) }; });

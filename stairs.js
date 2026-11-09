@@ -1,4 +1,4 @@
-import { initGamePage, showResult, setupCanvas, canvasPoint } from './common.js?v=23';
+import { initGamePage, showResult, setupCanvas, canvasPoint } from './common.js?v=24';
 
 initGamePage('stairs');
 
@@ -216,8 +216,10 @@ document.addEventListener('keydown', e => {
   else if (e.code === 'ArrowRight' || e.code === 'KeyD') { e.preventDefault(); step(1); }
   else if (e.code === 'Space') { e.preventDefault(); if (state === 'ready') start(); }
 });
-cv.addEventListener('mousedown', e => {
-  if (state !== 'play') return;
+// 마우스 클릭 · 손가락 탭 모두: 화면 왼쪽 절반이면 왼쪽, 오른쪽 절반이면 오른쪽
+cv.addEventListener('pointerdown', e => {
+  if (state !== 'play' || (e.pointerType === 'mouse' && e.button !== 0)) return;
+  e.preventDefault();
   step(canvasPoint(cv, W, e).x < W / 2 ? -1 : 1);
 });
 veil.addEventListener('click', start);

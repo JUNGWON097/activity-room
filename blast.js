@@ -1,4 +1,4 @@
-import { initGamePage, showResult, setupCanvas, canvasPoint } from './common.js?v=23';
+import { initGamePage, showResult, setupCanvas, canvasPoint } from './common.js?v=24';
 
 initGamePage('blast');
 
@@ -156,7 +156,7 @@ cv.addEventListener('pointerdown', e => {
   const p = canvasPoint(cv, W, e), i = slotAt(p);
   if (i < 0 || tray[i].used) return;
   drag = { i, p };
-  cv.setPointerCapture(e.pointerId);
+  try { cv.setPointerCapture(e.pointerId); } catch { }
 });
 cv.addEventListener('pointermove', e => { if (drag) drag.p = canvasPoint(cv, W, e); });
 cv.addEventListener('pointerup', e => {

@@ -108,6 +108,18 @@ kbd {
   border-radius: var(--radius); overflow: hidden; user-select: none;
 }
 .stage canvas { display: block; width: 100%; height: auto; }
+/* 손가락으로 게임할 때 화면이 밀리거나 확대 · 길게 누르기 메뉴가 뜨지 않게 */
+.stage { touch-action: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+@media (max-width: 600px) {
+  .top { padding: 12px 14px; gap: 10px; }
+  .top h1 { font-size: 18px; }
+  .game-layout { padding: 0 12px; gap: 14px; }
+  .grid { padding: 0 14px; grid-template-columns: 1fr; gap: 12px; margin-top: 18px; }
+  .card { padding: 16px; gap: 10px; }
+  .card .mini { min-height: 0; }
+  .hero { padding: 0 14px; }
+  .how { padding: 14px 16px; }
+}
 .stage.portrait { background: #0e0f18; }
 .stage.cute { background: #fde3ef; border-color: #f6c6dc; }
 .stage.cute .veil { background: rgba(120,80,130,.55); }

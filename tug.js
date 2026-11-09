@@ -1,4 +1,4 @@
-import { initGamePage, showResult, setupCanvas } from './common.js?v=23';
+import { initGamePage, showResult, setupCanvas } from './common.js?v=24';
 
 initGamePage('tug');
 
@@ -204,5 +204,10 @@ document.addEventListener('keydown', e => {
   if (document.querySelector('.overlay')) return;
   if (e.code === 'Space') { e.preventDefault(); if (!e.repeat) tap(performance.now()); }
 });
-cv.addEventListener('mousedown', e => { if (e.button === 0) tap(performance.now()); });
+// 마우스 클릭 · 손가락 탭(여러 손가락 각각 1회) 모두 받는다
+cv.addEventListener('pointerdown', e => {
+  if (e.pointerType === 'mouse' && e.button !== 0) return;
+  e.preventDefault();
+  tap(performance.now());
+});
 veil.addEventListener('click', start);

@@ -1,4 +1,4 @@
-import { initGamePage, showResult, setupCanvas, canvasPoint } from './common.js?v=23';
+import { initGamePage, showResult, setupCanvas, canvasPoint } from './common.js?v=24';
 
 initGamePage('omok');
 
@@ -163,14 +163,33 @@ function cellAt(p) {
   if (Math.hypot(p.x - px(i), p.y - py(j)) > GAP * .48) return null;
   return { x: i, y: j };
 }
-cv.addEventListener('pointermove', e => { hover = cellAt(canvasPoint(cv, W, e)); });
-cv.addEventListener('pointerleave', () => { hover = null; });
+// 손가락: 대면 가장 가까운 칸을 미리 보여 주고(끌어서 옮길 수 있음), 떼면 놓는다
+let touching = false;
+function nearestCell(p) {
+  const i = Math.round((p.x - M) / GAP), j = Math.round((p.y - TOP - M) / GAP);
+  return inside(i, j) ? { x: i, y: j } : null;
+}
+cv.addEventListener('pointermove', e => {
+  const p = canvasPoint(cv, W, e);
+  hover = e.pointerType === 'touch' ? nearestCell(p) : cellAt(p);
+});
+cv.addEventListener('pointerleave', e => { if (e.pointerType !== 'touch') hover = null; });
 cv.addEventListener('pointerdown', e => {
-  if (e.button !== 0 || state !== 'me') return;
+  if (state !== 'me') return;
+  if (e.pointerType === 'touch') { touching = true; hover = nearestCell(canvasPoint(cv, W, e)); e.preventDefault(); return; }
+  if (e.button !== 0) return;
   const c = cellAt(canvasPoint(cv, W, e));
   if (!c || board[c.y][c.x]) return;
   put(c.x, c.y, ME, performance.now());
 });
+cv.addEventListener('pointerup', e => {
+  if (!touching) return;
+  touching = false;
+  const c = hover; hover = null;
+  if (state !== 'me' || !c || board[c.y][c.x]) return;
+  put(c.x, c.y, ME, performance.now());
+});
+cv.addEventListener('pointercancel', () => { touching = false; hover = null; });
 
 /* ---------- 그리기 ---------- */
 function rr(x, y, w, h, r) {
@@ -216,7 +235,15 @@ function draw(now) {
     ctx.fillStyle = '#ff5c7a';
     ctx.beginPath(); ctx.arc(px(lastMove.x), py(lastMove.y), 4, 0, Math.PI * 2); ctx.fill();
   }
-  if (state === 'me' && hover && !board[hover.y][hover.x]) stone(px(hover.x), py(hover.y), ME, .4);
+  if (state === 'me' && hover && !board[hover.y][hover.x]) {
+    // 손가락으로 가려지지 않게, 대고 있는 동안은 그 줄 · 칸에 길게 표시
+    if (touching) {
+      ctx.strokeStyle = 'rgba(255,92,122,.55)'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(px(0), py(hover.y)); ctx.lineTo(px(N - 1), py(hover.y)); ctx.moveTo(px(hover.x), py(0)); ctx.lineTo(px(hover.x), py(N - 1)); ctx.stroke();
+      ctx.beginPath(); ctx.arc(px(hover.x), py(hover.y), GAP * .62, 0, Math.PI * 2); ctx.stroke();
+    }
+    stone(px(hover.x), py(hover.y), ME, touching ? .7 : .4);
+  }
   if (winLine) {
     const pulse = .6 + .4 * Math.sin(now / 120);
     ctx.strokeStyle = `rgba(255,92,122,${pulse})`; ctx.lineWidth = 4;

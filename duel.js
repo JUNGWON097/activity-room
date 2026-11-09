@@ -1,4 +1,4 @@
-import { initGamePage, showResult } from './common.js?v=23';
+import { initGamePage, showResult } from './common.js?v=24';
 
 initGamePage('duel');
 
@@ -73,7 +73,13 @@ function finish() {
   });
 }
 
-stage.addEventListener('mousedown', e => { if (e.button === 0) press(performance.now()); });
+// 마우스 클릭 · 손가락 탭 모두 받는다
+stage.addEventListener('pointerdown', e => {
+  if (e.pointerType === 'mouse' && e.button !== 0) return;
+  if (e.target.closest('a, button')) return;
+  e.preventDefault();
+  press(performance.now());
+});
 document.addEventListener('keydown', e => {
   if (e.repeat || document.querySelector('.overlay')) return;
   if (e.code === 'Space' || e.code === 'Enter') { e.preventDefault(); press(performance.now()); }

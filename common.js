@@ -121,7 +121,22 @@ export const GAMES = {
       tips: ['유령은 <b>손전등 빛을 받는 동안 움직이지 못해요.</b> 빛이 닿지 않으면 다가와요.', '배터리가 닳으면 손전등이 꺼져요. 바닥의 🔋 건전지를 주우세요. 꺼 두면 배터리가 줄지 않아요.', '<b>사물함</b> 앞에서 E를 누르면 숨어요. 숨으면 유령이 나를 놓치고 다른 곳으로 가요. 나온 뒤에도 잠깐은 못 찾아요.', '사물함 안은 <b>무조건 안전</b>해요. 유령이 바로 옆에 있어도 못 잡고, 근처 유령은 사물함에서 멀어져요.', '숨는 동안 💨 숨이 줄어요(최대 3초). 다 떨어지면 저절로 튀어나오고, 숨이 어느 정도 돌아와야 다시 숨을 수 있어요.', '사물함에서 나온 직후 1초 동안은 잡히지 않아요.', '한 번 비춘 길은 어둡게 남아서 지도처럼 쌓여요.', '열쇠를 2개 모으면 유령이 하나 더 나타나요.', '심장 소리가 빨라지고 손전등이 깜빡이면 유령이 가까이 있다는 뜻이에요.', '열쇠 3개를 다 모으면 비상구의 초록 불빛이 멀리서도 보여요.', '⚠️ 갑자기 놀라는 장면과 소리가 있어요.'],
     } },
 };
+// 휴대폰에서도 할 수 있는 게임과 손가락 조작 안내(나머지는 휴대폰에서 숨긴다)
+const TOUCH = {
+  archery: [['손가락 꾹 누르기', '활시위 당기기 — 조준점은 손가락보다 조금 위'], ['누른 채 움직이기', '조준점 옮기기'], ['손 떼기', '발사']],
+  duel: [['화면 탭', '쏘기']],
+  roll: [['손가락 대고 움직이기', '공이 손가락 조금 위를 따라가요 (좌우 · 앞뒤)']],
+  stairs: [['화면 왼쪽 탭', '다음 계단이 왼쪽 위일 때'], ['화면 오른쪽 탭', '다음 계단이 오른쪽 위일 때']],
+  tug: [['화면 탭', '한 번 탭할 때마다 1회 (여러 손가락으로 번갈아 쳐도 돼요)']],
+  blast: [['끌어서 놓기', '블록을 집어 판 위에 놓기']],
+  merge: [['손가락 대고 좌우로', '떨어뜨릴 위치 고르기'], ['손 떼기', '떨어뜨리기']],
+  omok: [['손가락 대기', '놓을 자리 미리 보기 (대고 끌면 옮겨져요)'], ['손 떼기', '돌 놓기']],
+};
+for (const [id, keys] of Object.entries(TOUCH)) { GAMES[id].mobile = true; GAMES[id].touchKeys = keys; }
 export const GAME_IDS = Object.keys(GAMES);
+// 마우스 없이 손가락만 쓰는 기기(휴대폰 · 태블릿)
+export const IS_MOBILE = window.matchMedia('(pointer: coarse)').matches && !window.matchMedia('(any-pointer: fine)').matches;
+export const VISIBLE_IDS = IS_MOBILE ? GAME_IDS.filter(id => GAMES[id].mobile) : GAME_IDS;
 
 export function esc(s) {
   return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -223,10 +238,22 @@ export function initGamePage(id) {
     <a class="home" href="./${QS}">← 전체 게임</a>
     <h1><span>${g.icon}</span> ${g.name}${DEV ? ' <small class="dev">연습 모드</small>' : ''}</h1>
     <button class="nick-chip" type="button"></button>`;
-  document.getElementById('how').innerHTML = howHTML(g.how);
+  // 휴대폰이면 손가락 조작 안내로 바꿔 보여 준다
+  const keys = IS_MOBILE && g.touchKeys ? g.touchKeys : g.how.keys;
+  document.getElementById('how').innerHTML = howHTML({ ...g.how, keys });
   // 시작 화면에도 조작법을 짧게 보여 준다
   document.querySelectorAll('.veil > div').forEach(v => v.insertAdjacentHTML('beforeend',
-    `<ul class="veil-keys">${g.how.keys.map(([k, d]) => `<li><kbd>${k}</kbd> ${d}</li>`).join('')}</ul>`));
+    `<ul class="veil-keys">${keys.map(([k, d]) => `<li><kbd>${k}</kbd> ${d}</li>`).join('')}</ul>`));
+  // 휴대폰이면 '클릭 · 스페이스' 안내를 '탭'으로
+  if (IS_MOBILE) document.querySelectorAll('.veil .t, .veil .s, #t, #s').forEach(el => {
+    el.textContent = el.textContent.replace(/클릭하거나 스페이스로 시작|클릭해서 시작/, '탭해서 시작').replace('또는 스페이스 · ', '');
+  });
+  // 휴대폰에서 지원하지 않는 게임에 주소로 바로 들어온 경우
+  if (IS_MOBILE && !g.mobile) {
+    // 시작 화면 위에 한 겹 더 덮어 시작을 막는다
+    const stage = document.querySelector('.stage');
+    if (stage) stage.insertAdjacentHTML('beforeend', `<div class="veil" style="z-index:9;cursor:default"><div><div class="t">💻 PC에서 해 주세요</div><div class="s">이 게임은 키보드 · 마우스가 필요해요</div><p style="margin-top:16px"><a class="btn primary" href="./${QS}">휴대폰용 게임 보러 가기</a></p></div></div>`);
+  }
   paintNickChips();
   // free: 점수 없이 노는 게임은 랭킹을 부르지 않는다
   if (g.free) { document.querySelector('.nick-chip').addEventListener('click', () => askNick()); return; }

@@ -1,4 +1,4 @@
-import { initGamePage, showResult, setupCanvas, canvasPoint } from './common.js?v=23';
+import { initGamePage, showResult, setupCanvas, canvasPoint } from './common.js?v=24';
 
 initGamePage('merge');
 
@@ -184,11 +184,21 @@ function draw(now) {
 function frame(now) { update(now); draw(now); requestAnimationFrame(frame); }
 requestAnimationFrame(frame);
 
+// 마우스: 움직여 조준, 클릭하면 떨어뜨림. 손가락: 대고 좌우로 조준, 떼면 떨어뜨림
+let touchAiming = false;
 cv.addEventListener('pointermove', e => { if (state === 'play') { aimX = canvasPoint(cv, W, e).x; clampAim(); } });
 cv.addEventListener('pointerdown', e => {
-  if (e.button !== 0 || state !== 'play') return;
-  aimX = canvasPoint(cv, W, e).x; dropFruit(performance.now());
+  if (state !== 'play') return;
+  aimX = canvasPoint(cv, W, e).x; clampAim();
+  if (e.pointerType === 'touch') { touchAiming = true; e.preventDefault(); return; }
+  if (e.button === 0) dropFruit(performance.now());
 });
+cv.addEventListener('pointerup', e => {
+  if (!touchAiming) return;
+  touchAiming = false;
+  if (state === 'play') dropFruit(performance.now());
+});
+cv.addEventListener('pointercancel', () => { touchAiming = false; });
 document.addEventListener('keydown', e => {
   if (document.querySelector('.overlay')) return;
   if (e.code === 'ArrowLeft' || e.code === 'KeyA') { keys.left = true; e.preventDefault(); }

@@ -1,4 +1,4 @@
-import { initGamePage, showResult, setupCanvas, canvasPoint } from './common.js?v=23';
+import { initGamePage, showResult, setupCanvas, canvasPoint } from './common.js?v=24';
 
 initGamePage('archery');
 
@@ -64,13 +64,16 @@ function scoreAt(x, y) {
   return { s: Math.max(1, 10 - Math.floor(d / RING)), x10: d < RING / 2 };
 }
 
-cv.addEventListener('mousemove', e => { mouse = canvasPoint(cv, W, e); });
-cv.addEventListener('mousedown', e => {
-  if (phase !== 'aim' || e.button !== 0) return;
-  mouse = canvasPoint(cv, W, e);
+// 손가락이면 조준점이 손가락에 가리지 않게 조금 위에 둔다
+const aimAt = e => { const p = canvasPoint(cv, W, e); return e.pointerType === 'touch' ? { x: p.x, y: p.y - 70 } : p; };
+cv.addEventListener('pointermove', e => { mouse = aimAt(e); });
+cv.addEventListener('pointerdown', e => {
+  if (phase !== 'aim' || (e.pointerType === 'mouse' && e.button !== 0)) return;
+  e.preventDefault();
+  mouse = aimAt(e);
   holding = true; drawStart = performance.now();
 });
-window.addEventListener('mouseup', () => {
+window.addEventListener('pointerup', () => {
   if (!holding || phase !== 'aim') return;
   const t = performance.now();
   const p = power(t), sw = sway(t);
