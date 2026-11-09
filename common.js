@@ -199,9 +199,12 @@ export async function saveScore(id, score, extra = {}) {
   return { nick, isNew, prev, best: isNew ? score : prev };
 }
 export async function topScores(id, n = 20) {
-  const q = query(collection(db, ROOT, GAMES[id].store || id, 'scores'), orderBy('score', GAMES[id].order), limit(n));
+  // 점수 순으로 넉넉히 받아 와서, 같은 점수면 먼저 달성한 사람(at이 이른 쪽)을 위로 올린다
+  const q = query(collection(db, ROOT, GAMES[id].store || id, 'scores'), orderBy('score', GAMES[id].order), limit(Math.max(n * 10, 200)));
   const s = await getDocs(q);
-  return s.docs.map(d => d.data());
+  const rows = s.docs.map(d => d.data());
+  rows.sort((a, b) => a.score === b.score ? (a.at ?? Infinity) - (b.at ?? Infinity) : (isBetter(id, a.score, b.score) ? -1 : 1));
+  return rows.slice(0, n);
 }
 export function boardHTML(id, rows, me) {
   if (!rows.length) return '<p class="muted empty">아직 기록이 없어요. 첫 1등이 되어 보세요!</p>';
