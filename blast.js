@@ -1,4 +1,4 @@
-import { initGamePage, showResult, setupCanvas, canvasPoint } from './common.js?v=28';
+import { initGamePage, showResult, setupCanvas, canvasPoint } from './common.js?v=29';
 
 initGamePage('blast');
 
@@ -86,11 +86,24 @@ function newTray() {
     tray = [makePiece(), makePiece(), makePiece()];
     if (solvable(tray)) return;
   }
-  // 판이 많이 찼으면 작은 블록(1~3칸)으로 다시 찾아본다
-  for (let i = 0; i < 60; i++) {
-    tray = [0, 1, 2].map(() => { let p; do { p = makePiece(); } while (p.cells.length > 3); return p; });
+  // 판이 많이 찼으면: 지금 판에 들어가는 모양만 모아 무작위로 다시 찾고
+  const fit = SHAPES.map(cells => shapeToPiece(cells)).filter(p => solvable([p]));
+  const pick = () => shapeToPiece(fit[Math.floor(Math.random() * fit.length)].cells);
+  if (fit.length) for (let i = 0; i < 80; i++) {
+    tray = [pick(), pick(), pick()];
     if (solvable(tray)) return;
   }
+  // 그래도 없으면 작은 블록부터 모든 조합을 차례로 따져 본다(빠뜨리는 경우 없음)
+  const bySize = fit.slice().sort((a, b) => a.cells.length - b.cells.length);
+  for (let a = 0; a < bySize.length; a++) for (let b = a; b < bySize.length; b++) for (let c = b; c < bySize.length; c++) {
+    const set = [bySize[a], bySize[b], bySize[c]].map(p => shapeToPiece(p.cells));
+    if (solvable(set)) { tray = set.sort(() => Math.random() - .5); return; }
+  }
+  // 어떤 세 개도 다 놓을 수 없는 판: 들어가는 블록이라도 주고, 다 쓰면 게임이 끝난다
+  tray = [0, 1, 2].map(() => (fit.length ? pick() : makePiece()));
+}
+function shapeToPiece(cells) {
+  return { ...makePiece(), cells, w: Math.max(...cells.map(c => c[0])) + 1, h: Math.max(...cells.map(c => c[1])) + 1 };
 }
 function start() {
   grid = Array.from({ length: N }, () => Array(N).fill(null));

@@ -1,4 +1,4 @@
-import { initGamePage, showResult, setupCanvas, canvasPoint } from './common.js?v=28';
+import { initGamePage, showResult, setupCanvas, canvasPoint } from './common.js?v=29';
 
 initGamePage('merge');
 
