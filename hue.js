@@ -1,4 +1,4 @@
-import { initGamePage, showResult, setupCanvas, canvasPoint } from './common.js?v=30';
+import { initGamePage, showResult, setupCanvas, canvasPoint } from './common.js?v=31';
 
 initGamePage('hue');
 
@@ -11,7 +11,7 @@ const veil = document.getElementById('veil');
 const INK = '#5b4466';
 
 let state = 'ready';   // ready → play → over → done
-let found, n, odd, base, oddCol, endAt, shake, flash, pops, lastN;
+let found = 0, n = 2, odd = 0, base = '', oddCol = '', endAt = 0, shake = 0, flash = 0, pops = [], lastN = 2;
 
 // 맞힐수록 칸이 많아지고(2×2 → 8×8) 색 차이가 줄어든다
 const sizeFor = lv => Math.min(8, 2 + Math.floor(Math.sqrt(lv * 1.6)));
