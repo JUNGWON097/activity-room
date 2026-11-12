@@ -1,4 +1,4 @@
-import { initGamePage, showResult, setupCanvas, canvasPoint, IS_MOBILE } from './common.js?v=34';
+import { initGamePage, showResult, setupCanvas, canvasPoint, IS_MOBILE } from './common.js?v=35';
 
 initGamePage('archery');
 
@@ -62,7 +62,9 @@ function gauss() { return (Math.random() + Math.random() + Math.random() - 1.5) 
 function scoreAt(x, y) {
   const d = Math.hypot(x - CX, y - CY);
   if (d > R) return { s: 0, x10: false };
-  return { s: Math.max(1, 10 - Math.floor(d / RING)), x10: d < RING / 2 };
+  // 한가운데 X는 10점 + 보너스 1점
+  const x10 = d < RING / 2;
+  return { s: x10 ? 11 : Math.max(1, 10 - Math.floor(d / RING)), x10 };
 }
 
 // 손가락이면 조준점이 손가락에 가리지 않게 조금 위에 둔다
@@ -89,7 +91,7 @@ window.addEventListener('pointerup', () => {
 function land(t) {
   const { s, x10 } = scoreAt(flight.tx, flight.ty);
   arrows.push({ x: flight.tx, y: flight.ty, s, x10 });
-  popup = { x: flight.tx, y: flight.ty, text: s === 0 ? '빗나감' : x10 ? 'X 10' : String(s), t0: t };
+  popup = { x: flight.tx, y: flight.ty, text: s === 0 ? '빗나감' : x10 ? 'X 10 +1' : String(s), t0: t };
   flight = null;
   if (arrows.length >= SHOTS) {
     phase = 'done';
