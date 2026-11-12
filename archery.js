@@ -1,4 +1,4 @@
-import { initGamePage, showResult, setupCanvas, canvasPoint, IS_MOBILE } from './common.js?v=33';
+import { initGamePage, showResult, setupCanvas, canvasPoint, IS_MOBILE } from './common.js?v=34';
 
 initGamePage('archery');
 

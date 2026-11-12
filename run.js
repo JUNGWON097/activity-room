@@ -1,4 +1,4 @@
-import { initGamePage, showResult, setupCanvas } from './common.js?v=33';
+import { initGamePage, showResult, setupCanvas } from './common.js?v=34';
 
 initGamePage('run');
 
@@ -294,12 +294,6 @@ function drawBunny(now) {
   ctx.globalAlpha = .85;
   for (const d of [-1, 1]) ell(d * headR * .86, headY + headR * .3, .055 * s, .035 * s, '#ffadc6', false);
   ctx.globalAlpha = 1;
-  // 리본
-  ctx.save(); ctx.translate(-.13 * s, headY - headR * .78); ctx.rotate(-.25);
-  ctx.fillStyle = '#ff7fa0'; ctx.strokeStyle = '#e8628a'; ctx.lineWidth = 1.5;
-  for (const d of [-1, 1]) { ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(d * .09 * s, -.05 * s); ctx.lineTo(d * .09 * s, .05 * s); ctx.closePath(); ctx.fill(); ctx.stroke(); }
-  ctx.beginPath(); ctx.arc(0, 0, .025 * s, 0, Math.PI * 2); ctx.fillStyle = '#ffd1df'; ctx.fill(); ctx.stroke();
-  ctx.restore();
   ctx.restore();
 }
 function text(s, x, y, size, fill = '#ff7fa0', lw = 8) {

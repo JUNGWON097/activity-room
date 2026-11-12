@@ -1,4 +1,4 @@
-import { initGamePage, showResult, setupCanvas, canvasPoint } from './common.js?v=33';
+import { initGamePage, showResult, setupCanvas, canvasPoint } from './common.js?v=34';
 
 initGamePage('snake');
 
