@@ -1,4 +1,4 @@
-import { initGamePage, showResult, setupCanvas } from './common.js?v=32';
+import { initGamePage, showResult, setupCanvas } from './common.js?v=33';
 
 initGamePage('run');
 
@@ -7,11 +7,11 @@ const HOR = 210;                    // 지평선 높이
 const F = 330;                      // 원근 배율
 const CAM_H = 2.6, Z_OFF = 2.6;     // 카메라 높이 · 토끼 뒤로 물러난 거리
 const LANE = 1.05, HALF = 1.65;     // 칸 너비 · 길 반폭
-const SPEED = 12;                   // 달리는 속도(m/초) — 끝까지 같다
+const SPEED = 16;                   // 달리는 속도(m/초) — 끝까지 같다
 const VIEW = 70;                    // 보이는 거리
-const JUMP_T = .62, JUMP_H = 1.25, DUCK_T = .62;
+const JUMP_T = .56, JUMP_H = 1.2, DUCK_T = .56;
 const G = 2 * JUMP_H / (JUMP_T / 2) ** 2, V0 = G * JUMP_T / 2;
-const WIN = 15;                     // 모퉁이 몇 m 앞부터 방향 틀기를 받는지
+const WIN = 19;                     // 모퉁이 몇 m 앞부터 방향 틀기를 받는지
 const cv = document.getElementById('cv');
 const ctx = setupCanvas(cv, W, H);
 const veil = document.getElementById('veil');
@@ -27,8 +27,8 @@ const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.f
 
 /* ---------- 길 만들기 ---------- */
 // 멀리 갈수록 장애물 사이가 좁아지고 종류가 늘어난다(속도는 그대로)
-const gapFor = d => Math.max(10, 26 - d / 40);
-const PATTERNS = [['block1', 0], ['low', 0], ['block2', 100], ['high', 180], ['gap', 300], ['blockLow', 500], ['blockHigh', 700], ['zigzag', 900]];
+const gapFor = d => Math.max(10.5, 24 - d / 35);
+const PATTERNS = [['block1', 0], ['low', 0], ['block2', 70], ['high', 140], ['gap', 240], ['blockLow', 400], ['blockHigh', 560], ['zigzag', 720]];
 const ALL = [-1, 0, 1];
 
 function addRow(z) {
@@ -46,8 +46,8 @@ function addRow(z) {
   else if (k === 'zigzag') {   // 열린 칸이 바로 이어서 바뀐다
     put('block', [l[0], l[1]]);
     const open2 = l[2] === 0 ? (Math.random() < .5 ? -1 : 1) : 0;
-    put('block', ALL.filter(v => v !== open2), z + 7);
-    return 7;
+    put('block', ALL.filter(v => v !== open2), z + 9);
+    return 9;
   }
   return 0;
 }
@@ -253,29 +253,53 @@ function drawBunny(now) {
     ctx.fillStyle = 'rgba(90,50,120,.22)'; ctx.beginPath(); ctx.ellipse(sx, gy, s * .3 * k, s * .07 * k, 0, 0, Math.PI * 2); ctx.fill();
   }
   const run = state === 'play' && py <= 0;
-  const hgt = (duck ? .48 : .8) * s, wid = (duck ? .64 : .5) * s;
-  const bob = run && !duck ? Math.abs(Math.sin(now / 85)) * s * .05 : 0;
+  const bob = run && !duck ? Math.abs(Math.sin(now / 75)) * s * .045 : 0;
   const shrink = fallen ? Math.max(.3, 1 + py * .25) : 1;
+  const OUT = '#f2a0bd', FUR = '#fffafc', PINK = '#ffc9da';
+  const ell = (x, y, rx, ry, fill, stroke = true, rot = 0) => {
+    ctx.beginPath(); ctx.ellipse(x, y, rx, ry, rot, 0, Math.PI * 2); ctx.fillStyle = fill; ctx.fill(); if (stroke) ctx.stroke();
+  };
   ctx.save();
   ctx.translate(sx, by - bob);
   ctx.rotate((lane - px) * .35);
-  ctx.scale(shrink, shrink);
-  // 발
-  const step = run ? Math.sin(now / 85) : 0;
-  ctx.fillStyle = '#ffc2d4';
-  for (const d of [-1, 1]) { ctx.beginPath(); ctx.ellipse(d * wid * .28, -s * .04 - Math.max(0, step * d) * s * .1, wid * .17, s * .07, 0, 0, Math.PI * 2); ctx.fill(); }
-  // 귀
-  ctx.fillStyle = '#fff'; ctx.strokeStyle = '#ffb3c8'; ctx.lineWidth = 3;
+  ctx.scale(shrink * 1.2, shrink * 1.2);
+  ctx.strokeStyle = OUT; ctx.lineWidth = 2.5; ctx.lineJoin = 'round';
+  // 머리가 큰 2등신. 숙이면 몸이 납작해지고 머리가 내려온다
+  const headY = (duck ? -.3 : -.5) * s, headR = .25 * s;
+  const bodyY = (duck ? -.13 : -.21) * s, bodyRX = (duck ? .25 : .2) * s, bodyRY = (duck ? .12 : .17) * s;
+  // 발(달릴 때 번갈아 든다)
+  const step = run ? Math.sin(now / 75) : 0;
+  for (const d of [-1, 1]) ell(d * .1 * s, -.035 * s - Math.max(0, step * d) * s * .09, .075 * s, .05 * s, PINK);
+  // 몸 · 팔
+  ell(0, bodyY, bodyRX, bodyRY, FUR);
+  for (const d of [-1, 1]) ell(d * bodyRX * .95, bodyY - .02 * s + (run ? -step * d * .03 * s : 0), .05 * s, .07 * s, FUR, true, d * .5);
+  // 동글동글 꼬리
+  ell(0, bodyY + .02 * s, .075 * s, .07 * s, '#fff');
+  ctx.save(); ctx.strokeStyle = 'rgba(242,160,189,.6)'; ctx.lineWidth = 1.5;
+  for (const a of [-.6, .6]) { ctx.beginPath(); ctx.arc(0, bodyY + .02 * s, .04 * s, a + Math.PI, a + Math.PI + .9); ctx.stroke(); }
+  ctx.restore();
+  // 귀: 왼쪽은 쫑긋, 오른쪽은 끝이 살짝 접힘
+  const wig = Math.sin(now / 110) * .06;
   for (const d of [-1, 1]) {
-    ctx.save(); ctx.translate(d * wid * .22, -hgt * .9); ctx.rotate(duck ? d * 1.15 : d * (.18 + Math.sin(now / 120 + d) * .05));
-    ctx.beginPath(); ctx.ellipse(0, -s * .2, s * .08, s * .22, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = '#ffd6e3'; ctx.beginPath(); ctx.ellipse(0, -s * .2, s * .035, s * .15, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#fff';
+    ctx.save(); ctx.translate(d * .1 * s, headY - headR * .8);
+    ctx.rotate(duck ? d * 1.25 : d * (.16 + (d > 0 ? .12 : 0)) + wig * d);
+    ell(0, -.15 * s, .075 * s, .17 * s, FUR);
+    ell(0, -.14 * s, .035 * s, .12 * s, PINK, false);
+    if (d > 0 && !duck) { ell(.045 * s, -.29 * s, .06 * s, .05 * s, FUR, true, .9); }
     ctx.restore();
   }
-  // 몸
-  ctx.beginPath(); ctx.ellipse(0, -hgt / 2 - s * .03, wid / 2, hgt / 2, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-  // 꼬리
-  ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(0, -hgt * .3, s * .09, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  // 머리
+  ell(0, headY, headR, headR * .92, FUR);
+  // 옆으로 살짝 보이는 볼터치
+  ctx.globalAlpha = .85;
+  for (const d of [-1, 1]) ell(d * headR * .86, headY + headR * .3, .055 * s, .035 * s, '#ffadc6', false);
+  ctx.globalAlpha = 1;
+  // 리본
+  ctx.save(); ctx.translate(-.13 * s, headY - headR * .78); ctx.rotate(-.25);
+  ctx.fillStyle = '#ff7fa0'; ctx.strokeStyle = '#e8628a'; ctx.lineWidth = 1.5;
+  for (const d of [-1, 1]) { ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(d * .09 * s, -.05 * s); ctx.lineTo(d * .09 * s, .05 * s); ctx.closePath(); ctx.fill(); ctx.stroke(); }
+  ctx.beginPath(); ctx.arc(0, 0, .025 * s, 0, Math.PI * 2); ctx.fillStyle = '#ffd1df'; ctx.fill(); ctx.stroke();
+  ctx.restore();
   ctx.restore();
 }
 function text(s, x, y, size, fill = '#ff7fa0', lw = 8) {
