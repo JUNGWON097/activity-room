@@ -323,19 +323,27 @@ export async function showResult(id, score, { detail = '', onRetry, fail = false
   if (fail) return;
 
   const saveEl = ov.querySelector('.save');
-  try {
-    const r = await saveScore(id, score, extra);
-    const rows = await loadBoard(id, document.getElementById('board'));
-    const rank = rows ? rows.findIndex(x => x.nick === r.nick) + 1 : 0;
-    const rankTxt = rank ? ` · 랭킹 ${rank}위` : '';
-    saveEl.classList.remove('muted');
-    saveEl.innerHTML = r.isNew
-      ? `<b class="new">🎉 내 최고 기록${r.prev == null ? '' : ' 경신'}!</b>${rankTxt}`
-      : `내 최고 기록 ${fmt(id, r.best)}${rankTxt}`;
-  } catch (e) {
-    console.error(e);
-    saveEl.textContent = '기록을 저장하지 못했어요. 인터넷 연결을 확인해 주세요.';
-  }
+  // 저장이 실패하면 '다시 저장' 버튼을 띄워, 결과 창을 닫기 전까지 몇 번이든 다시 시도할 수 있게 한다
+  const trySave = async () => {
+    saveEl.className = 'save muted';
+    saveEl.textContent = '기록 저장 중…';
+    try {
+      const r = await saveScore(id, score, extra);
+      const rows = await loadBoard(id, document.getElementById('board'));
+      const rank = rows ? rows.findIndex(x => x.nick === r.nick) + 1 : 0;
+      const rankTxt = rank ? ` · 랭킹 ${rank}위` : '';
+      saveEl.classList.remove('muted');
+      saveEl.innerHTML = r.isNew
+        ? `<b class="new">🎉 내 최고 기록${r.prev == null ? '' : ' 경신'}!</b>${rankTxt}`
+        : `내 최고 기록 ${fmt(id, r.best)}${rankTxt}`;
+    } catch (e) {
+      console.error(e);
+      saveEl.classList.remove('muted');
+      saveEl.innerHTML = '기록을 저장하지 못했어요. 인터넷 연결을 확인한 뒤 다시 눌러 주세요.<br><button class="btn primary resave" type="button" style="margin-top:10px">다시 저장</button>';
+      saveEl.querySelector('.resave').addEventListener('click', trySave);
+    }
+  };
+  trySave();
 }
 
 /* ---------- 캔버스 도우미 ---------- */

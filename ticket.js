@@ -1,4 +1,4 @@
-import { initGamePage, showResult } from './common.js?v=35';
+import { initGamePage, showResult } from './common.js?v=36';
 
 initGamePage('ticket');
 
