@@ -182,20 +182,20 @@ export const VISIBLE_IDS = IS_MOBILE ? GAME_IDS.filter(id => GAMES[id].mobile) :
 
 /* ---------- AI · 자동 조작 막기 ---------- */
 // 1) 자동화 도구가 조종하는 브라우저(Selenium · Playwright · Puppeteer 등)는 navigator.webdriver가 켜져 있다 → 게임을 막는다
-// 2) 사람이 아니라 스크립트가 만든 가짜 입력(isTrusted가 false)은 게임에 전달하지 않고, 그 페이지에서는 기록을 저장하지 않는다
+// 2) 스크립트가 만든 가짜 키 · 마우스 · 터치 입력(isTrusted가 false)은 게임에 전달하지 않고 버린다.
+//    가짜 입력이 보였다고 기록 저장까지 막지는 않는다 — 한글 입력기 · 브라우저 확장 프로그램도 이런 이벤트를 만들어
+//    사람이 직접 친 판이 막히는 일이 있었다. 글자 입력(input · composition) 이벤트는 건드리지 않는다
 export const AUTOMATED = navigator.webdriver === true;
-let tainted = AUTOMATED;
-const GUARD_EVENTS = ['keydown', 'keyup', 'keypress', 'beforeinput', 'input', 'compositionstart', 'compositionend',
+const tainted = AUTOMATED;
+const GUARD_EVENTS = ['keydown', 'keyup', 'keypress',
   'pointerdown', 'pointerup', 'pointermove', 'mousedown', 'mouseup', 'mousemove', 'click', 'dblclick',
   'touchstart', 'touchmove', 'touchend', 'wheel'];
 for (const t of GUARD_EVENTS) {
   window.addEventListener(t, e => {
     if (e.isTrusted) return;
-    tainted = true;
     e.stopImmediatePropagation(); e.preventDefault();
   }, true);
 }
-export const isTainted = () => tainted;
 
 export function esc(s) {
   return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
