@@ -1,4 +1,4 @@
-import { initGamePage, showResult, setupCanvas, loadBoard, IS_MOBILE, esc } from './common.js?v=38';
+import { initGamePage, showResult, setupCanvas, loadBoard, IS_MOBILE, esc } from './common.js?v=39';
 
 initGamePage('typing');
 
@@ -151,6 +151,34 @@ function guardInput(inp) {
   // 붙여 넣기 · 끌어다 놓기 금지
   for (const ev of ['paste', 'drop']) inp.addEventListener(ev, e => e.preventDefault());
 }
+// 한글 조합 중인지 기록한다(마지막 글자가 아직 확정 전인지)
+function trackComposing(inp) {
+  const st = { on: false };
+  inp.addEventListener('compositionstart', () => { st.on = true; });
+  inp.addEventListener('compositionend', () => { st.on = false; });
+  return st;
+}
+// 엔터: 한글 조합 중이어도 바로 넘긴다. 입력칸 값에는 조합 중인 마지막 글자도 들어 있으니 그대로 쓰고,
+// 남은 조합은 입력칸을 잠깐 놓았다 다시 잡아 끊는다(안 그러면 다음 줄에 마지막 글자가 따라온다)
+function bindEnter(inp, form, comp, onEnter) {
+  let last = 0;
+  const fire = () => {
+    const now = performance.now();
+    if (now - last < 250) return;   // 조합 중 엔터는 브라우저가 두 번 보내기도 한다
+    last = now;
+    const v = inp.value;
+    if (comp.on) { inp.blur(); inp.value = ''; comp.on = false; inp.focus(); }
+    else inp.value = '';
+    onEnter(v);
+  };
+  inp.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.keyCode === 13) { e.preventDefault(); fire(); }
+  });
+  inp.addEventListener('beforeinput', e => {
+    if (e.inputType === 'insertLineBreak' || e.inputType === 'insertParagraph') { e.preventDefault(); fire(); }
+  });
+  form.addEventListener('submit', e => { e.preventDefault(); fire(); });
+}
 
 /* ---------- 메뉴 ---------- */
 function menu() {
@@ -169,7 +197,7 @@ function menu() {
 
 /* ---------- 타자 연습(짧은 글 · 긴 글 공통) ---------- */
 function runTyping({ title, lines, onEnd }) {
-  let idx = 0, t0 = 0, composing = false, pending = false, lastCommit = 0;
+  let idx = 0, t0 = 0;
   const tot = { strokes: 0, sec: 0, correct: 0, chars: 0, best: 0 };
   setScreen(`<div class="hud">
       <span class="ttl">${esc(title)}</span><span id="prog"></span>
@@ -182,15 +210,20 @@ function runTyping({ title, lines, onEnd }) {
     <p class="hint">위 글자를 그대로 치고 ${ENTER} → 다음 줄 · 틀린 글자는 타수에서 빠져요</p>`);
   const inp = $('#inp'), target = $('#target');
   guardInput(inp);
+  const comp = trackComposing(inp);
   $('#quit').addEventListener('click', menu);
 
-  // 지금 줄에서 맞게 친 글자 수 · 타수. 조합 중인 마지막 글자는 아직 세지 않는다
-  function cur() {
-    const v = inp.value, t = lines[idx] || '';
-    const n = Math.min(v.length, t.length) - (composing && v.length <= t.length ? 1 : 0);
-    let correct = 0, st = 0;
-    for (let i = 0; i < n; i++) if (v[i] === t[i]) { correct++; st += strokes(t[i]); }
-    return { correct, st, typed: Math.max(0, n), sec: t0 ? (performance.now() - t0) / 1000 : 0 };
+  // 지금 줄에서 맞게 친 글자 수 · 타수.
+  // 조합 중인 마지막 글자는 정답과 같으면 맞은 것으로 치고, 아직 다르면(쓰는 중) 세지 않는다
+  function cur(v = inp.value, final = false) {
+    const t = lines[idx] || '';
+    let correct = 0, st = 0, typed = 0;
+    for (let i = 0; i < Math.min(v.length, t.length); i++) {
+      const pendingChar = !final && comp.on && i === v.length - 1;
+      if (v[i] === t[i]) { correct++; st += strokes(t[i]); typed++; }
+      else if (!pendingChar) typed++;
+    }
+    return { correct, st, typed, sec: t0 ? (performance.now() - t0) / 1000 : 0 };
   }
   function hud() {
     const c = cur(), sec = tot.sec + c.sec, st = tot.strokes + c.st;
@@ -203,7 +236,7 @@ function runTyping({ title, lines, onEnd }) {
     let h = '';
     for (let i = 0; i < t.length; i++) {
       let cl = '';
-      if (i < v.length) cl = composing && i === v.length - 1 ? 'typing' : v[i] === t[i] ? 'ok' : 'bad';
+      if (i < v.length) cl = v[i] === t[i] ? 'ok' : comp.on && i === v.length - 1 ? 'typing' : 'bad';
       else if (i === v.length) cl = 'cur';
       h += `<span class="${cl}">${esc(t[i])}</span>`;
     }
@@ -217,17 +250,12 @@ function runTyping({ title, lines, onEnd }) {
     $('#barFill').style.width = `${idx / lines.length * 100}%`;
     paint();
   }
-  function commit() {
-    if (composing) { pending = true; return; }
-    const v = inp.value;
-    if (!v.trim()) return;
-    const now = performance.now();
-    if (now - lastCommit < 150) return;
-    lastCommit = now;
-    const t = lines[idx], c = cur(), sec = Math.max(.5, c.sec);
+  function commit(v) {
+    if (!v.trim()) { paint(); return; }
+    const t = lines[idx], c = cur(v, true), sec = Math.max(.5, c.sec);
     tot.strokes += c.st; tot.sec += sec; tot.correct += c.correct; tot.chars += Math.max(t.length, v.length);
     tot.best = Math.max(tot.best, Math.round(c.st / sec * 60));
-    inp.value = ''; t0 = 0; idx++;
+    t0 = 0; idx++;
     if (idx >= lines.length) {
       clearInterval(timer);
       $('#barFill').style.width = '100%';
@@ -236,13 +264,9 @@ function runTyping({ title, lines, onEnd }) {
     }
     showLine(); hud();
   }
-  inp.addEventListener('compositionstart', () => { composing = true; });
-  inp.addEventListener('compositionend', () => {
-    composing = false; paint();
-    if (pending) { pending = false; setTimeout(commit, 0); }
-  });
-  inp.addEventListener('input', () => { if (!t0 && inp.value) t0 = performance.now(); paint(); hud(); });
-  $('#form').addEventListener('submit', e => { e.preventDefault(); setTimeout(commit, 0); });
+  inp.addEventListener('compositionend', () => { if (idx < lines.length) paint(); });
+  inp.addEventListener('input', () => { if (idx >= lines.length) return; if (!t0 && inp.value) t0 = performance.now(); paint(); hud(); });
+  bindEnter(inp, $('#form'), comp, commit);
   const timer = setInterval(hud, 250);
   cleanup = () => clearInterval(timer);
   showLine();
@@ -323,7 +347,7 @@ function startMeteor() {
 
   const field = Array.from({ length: 50 }, () => ({ x: Math.random() * MW, y: Math.random() * GROUND, z: .3 + Math.random() * .7 }));
   let rocks = [], fx = [], shots = [], texts = [], bag = [];
-  let score = 0, kills = 0, level = 1, shield = 3, spawnT = .6, flash = 0, alive = true, raf = 0, last = performance.now(), composing = false;
+  let score = 0, kills = 0, level = 1, shield = 3, spawnT = .6, flash = 0, alive = true, raf = 0, last = performance.now();
   const nextWord = () => { if (!bag.length) bag = shuffle([...WORDS]); return bag.pop(); };
 
   function hud() {
@@ -424,7 +448,8 @@ function startMeteor() {
       ctx.strokeStyle = `rgba(255,255,255,${a})`; ctx.lineWidth = 1.5; ctx.stroke();
     }
     // 운석 + 단어. 지금 치고 있는 글자와 앞부분이 같으면 그만큼 하늘색으로
-    const v = inp.value.trim(), typed = composing ? v.slice(0, -1) : v;
+    // 조합 중인 마지막 글자까지 맞으면 그만큼, 아직 쓰는 중이면 그 앞까지 하늘색으로
+    const v = inp.value.trim(), vShort = comp.on ? v.slice(0, -1) : v;
     ctx.font = '16px Galmuri11, monospace'; ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
     for (const r of rocks) {
       const img = rockSprite(r.r, r.gold);
@@ -432,7 +457,7 @@ function startMeteor() {
       // 꼬리
       ctx.fillStyle = r.gold ? 'rgba(255,200,61,.35)' : 'rgba(185,166,255,.3)';
       for (let i = 1; i <= 3; i++) ctx.fillRect(Math.round(r.x - 2), Math.round(r.y - r.r - i * 6), 4, 3);
-      const m = typed && r.word.startsWith(typed) ? typed.length : 0;
+      const m = v && r.word.startsWith(v) ? v.length : vShort && r.word.startsWith(vShort) ? vShort.length : 0;
       const bx = Math.round(r.x - r.tw / 2), by = Math.round(r.y + r.r + 4);
       ctx.fillStyle = m ? 'rgba(10,40,60,.92)' : 'rgba(5,6,20,.82)'; ctx.fillRect(bx, by, Math.round(r.tw), 22);
       ctx.strokeStyle = r.gold ? '#ffc83d' : m ? '#5ef1ff' : '#3b4fa8'; ctx.lineWidth = 1; ctx.strokeRect(bx + .5, by + .5, Math.round(r.tw) - 1, 21);
@@ -470,13 +495,13 @@ function startMeteor() {
     if (alive) raf = requestAnimationFrame(loop);
   }
 
-  inp.addEventListener('compositionstart', () => { composing = true; });
-  inp.addEventListener('compositionend', () => { composing = false; });
+  const comp = trackComposing(inp);
   // 띄어쓰기를 치면 그 앞 단어로 발사
   inp.addEventListener('input', () => {
     if (/\s/.test(inp.value)) { const w = inp.value.split(/\s/)[0]; inp.value = ''; fire(w); }
   });
-  form.addEventListener('submit', e => { e.preventDefault(); setTimeout(() => { const w = inp.value; inp.value = ''; fire(w); }, 0); });
+  // 엔터도 발사(한글 조합 중이어도 바로)
+  bindEnter(inp, form, comp, fire);
 
   cleanup = () => { alive = false; cancelAnimationFrame(raf); };
   hud();
