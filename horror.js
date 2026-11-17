@@ -1,4 +1,4 @@
-import { initGamePage, showResult, setupCanvas, canvasPoint } from './common.js?v=40';
+import { initGamePage, showResult, setupCanvas, canvasPoint } from './common.js?v=41';
 
 initGamePage('horror');
 

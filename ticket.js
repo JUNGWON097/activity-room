@@ -1,4 +1,4 @@
-import { initGamePage, showResult } from './common.js?v=40';
+import { initGamePage, showResult } from './common.js?v=41';
 
 initGamePage('ticket');
 
@@ -17,7 +17,11 @@ const VENUES = [
 ];
 // 점수: 앞줄일수록(1000 → 200) · 가운데일수록(+최대 100) · 빨리 끝낼수록(+최대 600, 40초면 0)
 const ROW_MAX = 1000, ROW_MIN = 200, CENTER_MAX = 100, TIME_MAX = 600, TIME_PER_SEC = 15;
-const CAPTCHA_CHARS = 'ABCDEFGHJKLMNPRSTUVWXYZ';
+// 보안문자: 헷갈리지 않는 쉬운 한글 낱말(2~4글자)
+const CAPTCHA_WORDS = ['사과', '바다', '하늘', '구름', '나무', '기차', '우산', '연필', '시계', '모자', '가방', '고양이', '강아지', '토끼',
+  '호랑이', '다람쥐', '거북이', '무지개', '눈사람', '자전거', '비행기', '피아노', '바나나', '딸기', '수박', '포도', '감자', '고구마',
+  '김밥', '떡볶이', '라면', '만두', '팥빙수', '아이스크림', '도서관', '운동장', '놀이터', '해바라기', '민들레', '소나무', '보름달',
+  '별빛', '노을', '파도', '모래성', '등대', '편지', '선물', '풍선', '사탕', '초콜릿', '케이크', '공연장', '무대', '박수', '응원봉', '콘서트'];
 
 let round, results, venue, openAt, phase, earlyClicks, captchaMiss, clashes, queueNo, seats, mine, checking, simTimer, clockTimer, toastTimer;
 
@@ -227,8 +231,11 @@ function dialog(title, msg) {
   d.querySelector('button').addEventListener('click', () => d.remove());
 }
 
+let lastWord = '';
 function makeCaptcha() {
-  return Array.from({ length: 6 }, () => CAPTCHA_CHARS[Math.floor(Math.random() * CAPTCHA_CHARS.length)]).join('');
+  let w;
+  do w = CAPTCHA_WORDS[Math.floor(Math.random() * CAPTCHA_WORDS.length)]; while (w === lastWord);
+  return (lastWord = w);
 }
 function drawCaptcha(cv, text) {
   const ctx = cv.getContext('2d');
@@ -240,11 +247,12 @@ function drawCaptcha(cv, text) {
     ctx.bezierCurveTo(Math.random() * cv.width, Math.random() * cv.height, Math.random() * cv.width, Math.random() * cv.height, Math.random() * cv.width, Math.random() * cv.height);
     ctx.stroke();
   }
+  const step = Math.min(48, (cv.width - 30) / text.length), x0 = (cv.width - step * (text.length - 1)) / 2;
   [...text].forEach((ch, i) => {
     ctx.save();
-    ctx.translate(22 + i * 34, cv.height / 2 + (Math.random() - .5) * 16);
-    ctx.rotate((Math.random() - .5) * .8);
-    ctx.font = `900 ${28 + Math.random() * 10}px Pretendard, sans-serif`;
+    ctx.translate(x0 + i * step, cv.height / 2 + (Math.random() - .5) * 14);
+    ctx.rotate((Math.random() - .5) * .6);
+    ctx.font = `900 ${30 + Math.random() * 8}px Pretendard, sans-serif`;
     ctx.fillStyle = `hsl(${220 + Math.random() * 80},45%,${25 + Math.random() * 18}%)`;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText(ch, 0, 0);
@@ -254,19 +262,23 @@ function drawCaptcha(cv, text) {
 function showCaptcha() {
   let answer = makeCaptcha();
   body.insertAdjacentHTML('beforeend', `<div class="dim" id="cap"><form class="box">
-    <h4>문자를 입력해 주세요</h4>
-    <p>부정 예매 방지를 위해 아래 문자를 입력해 주세요</p>
+    <h4>보안문자를 입력해 주세요</h4>
+    <p>부정 예매 방지를 위해 아래 단어를 한글로 입력해 주세요</p>
     <canvas width="220" height="70"></canvas>
-    <input maxlength="6" autocomplete="off" spellcheck="false">
+    <input maxlength="10" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" lang="ko">
     <p class="err"></p>
     <button class="tk-btn" type="submit">입력 완료</button>
   </form></div>`);
   const cap = body.querySelector('#cap'), cv = cap.querySelector('canvas'), input = cap.querySelector('input'), err = cap.querySelector('.err');
   drawCaptcha(cv, answer);
   setTimeout(() => input.focus(), 30);
+  const norm = v => v.replace(/\s/g, '').normalize('NFC');
+  // 한글은 조합 중에 Enter가 씹힐 수 있어, 단어가 맞게 완성되면 바로 넘어간다
+  input.addEventListener('input', () => { if (cap.isConnected && norm(input.value) === answer) cap.remove(); });
   cap.querySelector('form').addEventListener('submit', e => {
     e.preventDefault();
-    if (input.value.trim().toUpperCase() === answer) { cap.remove(); return; }
+    if (!cap.isConnected) return;
+    if (norm(input.value) === answer) { cap.remove(); return; }
     captchaMiss++;
     err.textContent = '문자를 다시 입력해 주세요';
     cap.querySelector('.box').classList.remove('shake'); void cap.offsetWidth; cap.querySelector('.box').classList.add('shake');
