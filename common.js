@@ -180,6 +180,23 @@ export const IS_MOBILE = /Android|iPhone|iPad|iPod|Mobile/i.test(UA)
   || (window.matchMedia('(pointer: coarse)').matches && !window.matchMedia('(hover: hover)').matches);
 export const VISIBLE_IDS = IS_MOBILE ? GAME_IDS.filter(id => GAMES[id].mobile) : GAME_IDS;
 
+/* ---------- AI · 자동 조작 막기 ---------- */
+// 1) 자동화 도구가 조종하는 브라우저(Selenium · Playwright · Puppeteer 등)는 navigator.webdriver가 켜져 있다 → 게임을 막는다
+// 2) 사람이 아니라 스크립트가 만든 가짜 입력(isTrusted가 false)은 게임에 전달하지 않고, 그 페이지에서는 기록을 저장하지 않는다
+export const AUTOMATED = navigator.webdriver === true;
+let tainted = AUTOMATED;
+const GUARD_EVENTS = ['keydown', 'keyup', 'keypress', 'beforeinput', 'input', 'compositionstart', 'compositionend',
+  'pointerdown', 'pointerup', 'pointermove', 'mousedown', 'mouseup', 'mousemove', 'click', 'dblclick',
+  'touchstart', 'touchmove', 'touchend', 'wheel'];
+for (const t of GUARD_EVENTS) {
+  window.addEventListener(t, e => {
+    if (e.isTrusted) return;
+    tainted = true;
+    e.stopImmediatePropagation(); e.preventDefault();
+  }, true);
+}
+export const isTainted = () => tainted;
+
 export function esc(s) {
   return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
@@ -227,6 +244,7 @@ export async function ensureNick() { return getNick() || askNick(); }
 /* ---------- 기록 ---------- */
 // 닉네임마다 게임별 최고 기록 1건만 둔다. 판수(plays)는 매번 늘린다.
 export async function saveScore(id, score, extra = {}) {
+  if (tainted) throw Object.assign(new Error('자동 조작 감지'), { code: 'automation' });
   const nick = await ensureNick();
   const ref = doc(db, ROOT, GAMES[id].store || id, 'scores', nick);
   const snap = await getDoc(ref);
@@ -293,6 +311,11 @@ export function initGamePage(id) {
   if (IS_MOBILE) document.querySelectorAll('.veil .t, .veil .s, #t, #s').forEach(el => {
     el.textContent = el.textContent.replace(/클릭하거나 스페이스로 시작|클릭해서 시작/, '탭해서 시작').replace('또는 스페이스 · ', '');
   });
+  // 자동화 도구가 조종하는 브라우저면 시작 화면 위를 덮어 막는다
+  if (AUTOMATED) {
+    const stage = document.querySelector('.stage');
+    if (stage) stage.insertAdjacentHTML('beforeend', `<div class="veil" style="z-index:9;cursor:default"><div><div class="t">🤖 자동 조작 브라우저</div><div class="s">AI · 매크로 · 자동화 도구로는 플레이할 수 없어요</div></div></div>`);
+  }
   // 휴대폰에서 지원하지 않는 게임에 주소로 바로 들어온 경우
   if (IS_MOBILE && !g.mobile) {
     // 시작 화면 위에 한 겹 더 덮어 시작을 막는다
@@ -351,6 +374,7 @@ export async function showResult(id, score, { detail = '', onRetry, fail = false
     } catch (e) {
       console.error(e);
       saveEl.classList.remove('muted');
+      if (e.code === 'automation') { saveEl.textContent = '🤖 AI · 자동 조작이 감지돼 기록을 저장하지 않았어요.'; return; }
       saveEl.innerHTML = '기록을 저장하지 못했어요. 인터넷 연결을 확인한 뒤 다시 눌러 주세요.<br><button class="btn primary resave" type="button" style="margin-top:10px">다시 저장</button>';
       saveEl.querySelector('.resave').addEventListener('click', trySave);
     }
