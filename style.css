@@ -13,6 +13,8 @@
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; }
+/* 모바일: 두 번 탭해도 화면이 확대되지 않게 */
+html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
 body {
   background: var(--bg);
   color: var(--text);
