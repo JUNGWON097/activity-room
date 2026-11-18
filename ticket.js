@@ -1,4 +1,4 @@
-import { initGamePage, showResult } from './common.js?v=41';
+import { initGamePage, showResult } from './common.js?v=42';
 
 initGamePage('ticket');
 
@@ -260,6 +260,7 @@ function drawCaptcha(cv, text) {
   });
 }
 function showCaptcha() {
+  document.activeElement?.blur?.();
   let answer = makeCaptcha();
   body.insertAdjacentHTML('beforeend', `<div class="dim" id="cap"><form class="box">
     <h4>보안문자를 입력해 주세요</h4>
@@ -271,20 +272,28 @@ function showCaptcha() {
   </form></div>`);
   const cap = body.querySelector('#cap'), cv = cap.querySelector('canvas'), input = cap.querySelector('input'), err = cap.querySelector('.err');
   drawCaptcha(cv, answer);
-  setTimeout(() => input.focus(), 30);
+  // 한글 입력기는 '사라진 버튼'에 걸려 있던 상태로 새 입력칸을 받으면 첫 글자를 놓치곤 한다.
+  // 이전 포커스를 먼저 놓고, 입력칸을 잡았다 놓았다 다시 잡아 입력기를 새로 붙인다
+  const grab = () => { input.blur(); input.focus(); };
+  input.focus(); requestAnimationFrame(() => { if (document.activeElement === input && !input.value) grab(); });
+  let last = 0;
   const norm = v => v.replace(/\s/g, '').normalize('NFC');
-  // 한글은 조합 중에 Enter가 씹힐 수 있어, 단어가 맞게 완성되면 바로 넘어간다
+  // 단어가 맞게 완성되면 Enter 없이 바로 넘어간다
   input.addEventListener('input', () => { if (cap.isConnected && norm(input.value) === answer) cap.remove(); });
-  cap.querySelector('form').addEventListener('submit', e => {
-    e.preventDefault();
-    if (!cap.isConnected) return;
+  const check = () => {
+    const now = performance.now();
+    if (!cap.isConnected || now - last < 250) return;   // 조합 중 Enter는 두 번 올 때가 있다
+    last = now;
     if (norm(input.value) === answer) { cap.remove(); return; }
     captchaMiss++;
     err.textContent = '문자를 다시 입력해 주세요';
     cap.querySelector('.box').classList.remove('shake'); void cap.offsetWidth; cap.querySelector('.box').classList.add('shake');
     answer = makeCaptcha(); drawCaptcha(cv, answer);
-    input.value = ''; input.focus();
-  });
+    // 조합 중에 값을 지우면 남은 조합이 다음 첫 글자를 먹는다 → 입력칸을 놓고 지운 뒤 다시 잡는다
+    input.blur(); input.value = ''; input.focus();
+  };
+  input.addEventListener('keydown', e => { if (e.key === 'Enter' || e.keyCode === 13) { e.preventDefault(); check(); } });
+  cap.querySelector('form').addEventListener('submit', e => { e.preventDefault(); check(); });
 }
 
 /* ---------- 4. 결제 ---------- */
