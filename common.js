@@ -197,6 +197,38 @@ for (const t of GUARD_EVENTS) {
   }, true);
 }
 
+/* ---------- 홈 화면 앱: 당겨서 새로고침 ---------- */
+// 홈 화면에서 연 앱(standalone)에는 새로고침 버튼이 없다. 맨 위에서 아래로 끌었다 놓으면 새로고침한다.
+// 게임판(.stage) · 입력칸 · 결과 창에서 시작한 손가락은 무시한다 — 게임 조작과 섞이지 않게
+const STANDALONE = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+if (STANDALONE) {
+  const PULL = 80;
+  const tip = document.createElement('div');
+  tip.className = 'pull-tip';
+  document.body.appendChild(tip);
+  let y0 = null, x0 = 0, dy = 0;
+  const reset = () => { y0 = null; dy = 0; tip.style.transform = ''; tip.classList.remove('on', 'go'); };
+  window.addEventListener('touchstart', e => {
+    if (e.touches.length !== 1 || window.scrollY > 0 || e.target.closest?.('.stage, input, textarea, select, canvas, .modal')) return;
+    y0 = e.touches[0].clientY; x0 = e.touches[0].clientX;
+  }, { passive: true });
+  window.addEventListener('touchmove', e => {
+    if (y0 === null) return;
+    const p = e.touches[0];
+    dy = p.clientY - y0;
+    if (window.scrollY > 0 || dy < 0 || Math.abs(p.clientX - x0) > dy) { reset(); return; }
+    tip.classList.add('on');
+    tip.classList.toggle('go', dy >= PULL);
+    tip.textContent = dy >= PULL ? '↻ 놓으면 새로고침' : '↓ 당겨서 새로고침';
+    tip.style.transform = `translate(-50%, ${Math.min(dy, PULL * 1.6) * 0.6}px)`;
+  }, { passive: true });
+  window.addEventListener('touchend', () => {
+    if (y0 !== null && dy >= PULL) { tip.textContent = '↻ 새로고침 중…'; location.reload(); return; }
+    reset();
+  });
+  window.addEventListener('touchcancel', reset);
+}
+
 export function esc(s) {
   return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }

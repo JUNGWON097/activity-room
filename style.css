@@ -295,3 +295,11 @@ kbd {
   .stage.space, .screen { min-height: 420px; }
   .screen { padding: 14px; gap: 10px; }
 }
+
+/* 홈 화면 앱: 당겨서 새로고침 안내 */
+.pull-tip { position: fixed; top: -44px; left: 50%; transform: translate(-50%, 0); z-index: 50; pointer-events: none;
+  padding: 8px 14px; border-radius: 999px; background: var(--panel-2); color: var(--text); border: 1px solid var(--line);
+  font-size: 14px; font-weight: 700; white-space: nowrap; opacity: 0; transition: opacity .15s; }
+.pull-tip.on { opacity: 1; }
+.pull-tip.go { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+@media (display-mode: standalone) { html { overscroll-behavior-y: none; } }
