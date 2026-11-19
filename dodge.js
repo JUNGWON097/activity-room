@@ -1,4 +1,4 @@
-import { initGamePage, showResult, setupCanvas, canvasPoint } from './common.js?v=46';
+import { initGamePage, showResult, setupCanvas, canvasPoint } from './common.js?v=47';
 
 initGamePage('dodge');
 
@@ -160,21 +160,21 @@ document.addEventListener('keydown', e => {
 });
 document.addEventListener('keyup', e => { keys[e.code] = false; });
 window.addEventListener('blur', () => { keys = {}; });
-// 손가락 · 마우스: 누른 채 끌면 그만큼 우주선이 움직인다(손가락이 우주선을 가리지 않게)
+// 손가락 · 마우스: 누른 순간의 '손가락과 우주선 사이 거리'를 그대로 유지하며 따라온다
+// (손가락이 우주선을 가리지 않고, 오래 끌어도 사이가 벌어지지 않는다)
 let drag = null;
 cv.addEventListener('pointerdown', e => {
   if (state !== 'play') return;
   e.preventDefault();
   cv.setPointerCapture?.(e.pointerId);
   const p = canvasPoint(cv, W, e);
-  drag = { x: p.x, y: p.y };
+  drag = { id: e.pointerId, ox: ship.x - p.x, oy: ship.y - p.y };
 });
 cv.addEventListener('pointermove', e => {
-  if (!drag || state !== 'play') return;
+  if (!drag || drag.id !== e.pointerId || state !== 'play') return;
   const p = canvasPoint(cv, W, e);
-  ship.x += (p.x - drag.x) * 1.15; ship.y += (p.y - drag.y) * 1.15;
-  ship.x = Math.max(12, Math.min(W - 12, ship.x)); ship.y = Math.max(12, Math.min(H - 12, ship.y));
-  drag = { x: p.x, y: p.y };
+  ship.x = Math.max(12, Math.min(W - 12, p.x + drag.ox));
+  ship.y = Math.max(12, Math.min(H - 12, p.y + drag.oy));
 });
 const endDrag = () => { drag = null; };
 cv.addEventListener('pointerup', endDrag);
