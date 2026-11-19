@@ -1,4 +1,4 @@
-import { initGamePage, showResult, setupCanvas, canvasPoint } from './common.js?v=47';
+import { initGamePage, showResult, setupCanvas, canvasPoint } from './common.js?v=48';
 
 initGamePage('stairs');
 
@@ -99,8 +99,10 @@ const alt = () => -cam.y / RISE;   // 지금 화면이 보고 있는 높이(계�
 
 /* ---------- 그리기 도구 (레트로 픽셀) ---------- */
 const P = 4;
-const snap = v => Math.round(v / P) * P;
-function px(x, y, w, h, c) { ctx.fillStyle = c; ctx.fillRect(snap(x), snap(y), Math.max(P, snap(w)), Math.max(P, snap(h))); }
+// 위치는 1px 단위로 부드럽게 옮기고(4px 단위로 튀면 화면이 덜덜 떨린다), 크기만 4px 칸으로 맞춰 레트로 느낌을 낸다
+const snap = v => Math.round(v);
+const sz = v => Math.round(v / P) * P;
+function px(x, y, w, h, c) { ctx.fillStyle = c; ctx.fillRect(snap(x), snap(y), Math.max(P, sz(w)), Math.max(P, sz(h))); }
 function rng(seed) {
   let s = seed >>> 0;
   return () => { s = (s + 0x6D2B79F5) >>> 0; let t = s; t = Math.imul(t ^ t >>> 15, t | 1); t ^= t + Math.imul(t ^ t >>> 7, t | 61); return ((t ^ t >>> 14) >>> 0) / 4294967296; };
@@ -181,13 +183,15 @@ const LANDMARKS = [
   { type: 'galaxy', A: 2750, p: .14, x: .3, r: 120 },
   { type: 'blackhole', A: 3320, p: .22, x: .5, r: 56 },
 ];
+// 배경 천체 · 구름이 화면 움직임을 따라가는 정도(작을수록 느긋하게 움직여 멀미가 덜하다)
+const VP = .45;
 function makeChunk(c) {
   const r = rng(runSeed * 31 + c * 104729), list = [], A0 = c * CH, mid = A0 + CH / 2;
   const add = (type, o = {}) => {
     const p = o.p ?? (.3 + r() * .5);
-    list.push({ type, A: A0 + r() * CH, p, wx: r() * (W + 160) - 80 + cam.x * p, s: .7 + r() * .7, h: r(), ...o });
+    list.push({ type, A: A0 + r() * CH, p, wx: r() * (W + 160) - 80 + cam.x * p * VP, s: .7 + r() * .7, h: r(), ...o });
   };
-  for (const L of LANDMARKS) if (L.A >= A0 && L.A < A0 + CH) list.push({ ...L, lm: true, wx: L.x * W + cam.x * L.p, s: 1, h: .5 });
+  for (const L of LANDMARKS) if (L.A >= A0 && L.A < A0 + CH) list.push({ ...L, lm: true, wx: L.x * W + cam.x * L.p * VP, s: 1, h: .5 });
   const cloudN = mid < 40 ? 1 : mid < 600 ? 3 + Math.floor(r() * 3) : mid < 900 ? Math.floor(r() * 2) : 0;
   for (let i = 0; i < cloudN; i++) add('cloud');
   if (mid > 20 && mid < 280 && r() < .6) add('birds', { p: .7 });
@@ -203,12 +207,12 @@ function makeChunk(c) {
   return list;
 }
 function visibleObjects(a) {
-  const c0 = Math.floor((a - 160) / CH), c1 = Math.floor((a + 230) / CH), out = [];
+  const c0 = Math.floor((a - 420) / CH), c1 = Math.floor((a + 520) / CH), out = [];
   for (const k of chunks.keys()) if (k < c0 - 2) chunks.delete(k);
   for (let c = Math.max(0, c0); c <= c1; c++) {
     if (!chunks.has(c)) chunks.set(c, makeChunk(c));
     for (const o of chunks.get(c)) {
-      const y = PLAYER_Y - (o.A - a) * RISE * o.p, x = o.wx - cam.x * o.p, m = (o.r || 60) * 2.2;
+      const y = PLAYER_Y - (o.A - a) * RISE * o.p * VP, x = o.wx - cam.x * o.p * VP, m = (o.r || 60) * 2.2;
       if (y > -m && y < H + m && x > -m - 80 && x < W + m + 80) out.push({ o, x, y });
     }
   }
@@ -229,13 +233,13 @@ function cloud(x, y, s, a) {
 function planetBody(cx, cy, r, c1, c2, bands = 0, shade = true) {
   cx = snap(cx); cy = snap(cy);
   for (let dy = -r; dy < r; dy += P) {
-    const hw = snap(Math.sqrt(Math.max(0, r * r - (dy + P / 2) ** 2)));
+    const hw = sz(Math.sqrt(Math.max(0, r * r - (dy + P / 2) ** 2)));
     if (!hw) continue;
     ctx.fillStyle = bands && Math.floor((dy + r) / (r * 2 / (bands * 2 + 1))) % 2 ? c2 : c1;
     ctx.fillRect(cx - hw, snap(cy + dy), hw * 2, P);
     if (shade) {
-      ctx.fillStyle = 'rgba(0,0,0,.3)'; ctx.fillRect(cx + snap(hw * .3), snap(cy + dy), hw - snap(hw * .3), P);
-      ctx.fillStyle = 'rgba(255,255,255,.16)'; ctx.fillRect(cx - hw, snap(cy + dy), Math.max(P, snap(hw * .3)), P);
+      ctx.fillStyle = 'rgba(0,0,0,.3)'; ctx.fillRect(cx + sz(hw * .3), snap(cy + dy), hw - sz(hw * .3), P);
+      ctx.fillStyle = 'rgba(255,255,255,.16)'; ctx.fillRect(cx - hw, snap(cy + dy), Math.max(P, sz(hw * .3)), P);
     }
   }
 }
