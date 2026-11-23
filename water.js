@@ -1,10 +1,11 @@
-import { initGamePage, showResult, setupCanvas, canvasPoint } from './common.js?v=51';
+import { initGamePage, showResult, setupCanvas, canvasPoint } from './common.js?v=52';
 
 initGamePage('water');
 
 const W = 420, H = 580;
 const CAP = 4;                 // 병 하나에 물 4칸
-const TIME = 120;              // 2분 동안 최대한 많은 단계를 깬다
+// 단계마다 제한 시간이 있고, 시간 안에 못 풀면 끝난다(전체 시간 제한은 없다)
+const limitFor = lv => 30 + colorsFor(lv) * 10;   // 3색 60초 … 9색 120초
 const cv = document.getElementById('cv');
 const ctx = setupCanvas(cv, W, H);
 const veil = document.getElementById('veil');
@@ -12,7 +13,7 @@ const INK = '#4a3f66';
 const COLORS = ['#ff5c7a', '#ffa23a', '#ffd93d', '#4fcf7a', '#3fc6e8', '#3f6fe8', '#9a5cf0', '#ff8fd0', '#8a5a3a'];
 
 let state = 'ready';   // ready → play → over → done
-let bottles = [], start0 = [], history = [], sel = -1, level = 0, endAt = 0, pours = [], clearAt = 0, shake = { i: -1, t: 0 }, solvedFx = {};
+let bottles = [], start0 = [], history = [], sel = -1, level = 0, endAt = 0, limit = 60, leftAtClear = 0, pours = [], clearAt = 0, shake = { i: -1, t: 0 }, solvedFx = {};
 
 /* ---------- 문제 만들기 · 풀 수 있는지 확인 ---------- */
 const colorsFor = lv => Math.min(COLORS.length, 3 + Math.ceil(lv / 2));
@@ -62,11 +63,11 @@ function makeLevel(lv) {
 function loadLevel() {
   bottles = makeLevel(level); start0 = bottles.map(b => b.slice());
   history = []; sel = -1; pours = []; solvedFx = {};
+  limit = limitFor(level); endAt = performance.now() + limit * 1000;
 }
 function start() {
   level = 0; clearAt = 0;
   loadLevel();
-  endAt = performance.now() + TIME * 1000;
   state = 'play'; veil.hidden = true;
 }
 function layout() {
@@ -98,7 +99,7 @@ function tapBottle(i, now) {
   pours.push({ from: sel, to: i, col, t: now });
   if (isDone(b) && b.length) solvedFx[i] = now;
   sel = -1;
-  if (solved(bottles)) { clearAt = now; level++; setTimeout(() => { if (state === 'play') { clearAt = 0; loadLevel(); } }, 900); }
+  if (solved(bottles)) { leftAtClear = Math.max(0, endAt - now) / 1000; clearAt = now; level++; setTimeout(() => { if (state === 'play') { clearAt = 0; loadLevel(); } }, 900); }
 }
 function undo() { if (state !== 'play' || clearAt || !history.length) return; bottles = history.pop(); sel = -1; }
 function restart() { if (state !== 'play' || clearAt) return; history = []; bottles = start0.map(b => b.slice()); sel = -1; }
@@ -131,8 +132,8 @@ function draw(now) {
   g.addColorStop(0, '#eaf4ff'); g.addColorStop(1, '#f6ecff');
   ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
 
-  const left = state === 'play' ? Math.max(0, endAt - now) / 1000 : state === 'ready' ? TIME : 0;
-  if (state === 'play' && left <= 0) finish();
+  const left = state === 'ready' ? limitFor(0) : state !== 'play' ? 0 : clearAt ? leftAtClear : Math.max(0, endAt - now) / 1000;
+  if (state === 'play' && !clearAt && left <= 0) finish();
 
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   outlined(state === 'ready' ? '0' : String(level), W / 2, 46, '900 44px Pretendard, sans-serif', '#3f9be8');
@@ -140,12 +141,12 @@ function draw(now) {
   ctx.fillText('깬 단계', W / 2, 80);
   // 남은 시간 막대
   ctx.fillStyle = 'rgba(74,63,102,.12)'; rr(20, 98, W - 40, 14, 7); ctx.fill();
-  const k = left / TIME;
+  const k = left / (state === 'ready' ? limitFor(0) : limit);
   ctx.fillStyle = k < .15 ? (Math.floor(now / 200) % 2 ? '#ff5c7a' : '#ff9db0') : '#7fb8ff';
   if (k > 0) { rr(20, 98, Math.max(14, (W - 40) * k), 14, 7); ctx.fill(); }
   ctx.font = '800 13px Pretendard, sans-serif'; ctx.fillStyle = INK;
   const m = Math.floor(left / 60), s = Math.floor(left % 60);
-  ctx.fillText(`${m}:${String(s).padStart(2, '0')}`, W / 2, 128);
+  ctx.fillText(`이번 단계 남은 시간 ${m}:${String(s).padStart(2, '0')}`, W / 2, 128);
 
   if (state === 'ready') {
     // 미리보기 병
