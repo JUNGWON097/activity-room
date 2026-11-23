@@ -1,4 +1,4 @@
-import { initGamePage, showResult, setupCanvas, canvasPoint } from './common.js?v=55';
+import { initGamePage, showResult, setupCanvas, canvasPoint } from './common.js?v=56';
 
 initGamePage('stairs');
 
@@ -431,26 +431,25 @@ function drawBg(now) {
 }
 
 /* ---------- 계단 · 병아리 ---------- */
-function stepPal(i) {
-  if (i < 60) return ['#a0683e', '#5fbf4a', '#6e4630', '#8fe070'];          // 흙 벽돌 + 잔디
-  if (i < 350) return ['#d4e6fb', '#ffffff', '#8aaad6', '#ffffff'];         // 구름 블록
-  if (i < 600) return ['#ff9e6e', '#ffd2a0', '#c9603a', '#fff0d8'];         // 노을 블록
-  if (i < 1200) return ['#4a40a8', '#7d74f0', '#26205e', '#b0a8ff'];        // 밤하늘 블록
-  if (i < 2000) return ['#6b7390', '#aab3d0', '#3a4060', '#e8ecff'];        // 우주 금속판
-  if (i < 3200) return ['#7a3fa0', '#c88cff', '#3f1f5a', '#f0d8ff'];        // 성운 크리스탈
-  const h = (i * .3) % 360;
-  return [`hsl(${h},45%,40%)`, `hsl(${h},70%,70%)`, `hsl(${h},50%,22%)`, `hsl(${h},90%,88%)`];
+const CAKE = ['#ffd6e5', '#d9ccff', '#c8f0e0', '#ffe2b8'];   // 옛날 무지개 케이크 계단
+function rrect(x, y, w, h, r) {
+  ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
 }
 function drawStep(i, x, y, now) {
-  const [body, top, shade, shine] = stepPal(i);
   x = snap(x); y = snap(y);
-  px(x + 4, y + 8, STEP_W, STEP_H, 'rgba(0,0,0,.22)');
-  px(x, y, STEP_W, STEP_H, body);
-  px(x, y, STEP_W, 8, top);
-  px(x + 4, y, STEP_W - 16, 4, shine);
-  px(x, y + STEP_H - 4, STEP_W, 4, shade);
-  if (i >= 1200 && i < 2000) { px(x + 4, y + 12, 4, 4, shade); px(x + STEP_W - 8, y + 12, 4, 4, shade); }   // 리벳
-  if (i <= idx) { ctx.fillStyle = 'rgba(0,0,0,.18)'; ctx.fillRect(x, y, STEP_W, STEP_H); }
+  ctx.fillStyle = 'rgba(0,0,0,.18)'; rrect(x + 2, y + 5, STEP_W, STEP_H, 9); ctx.fill();
+  ctx.fillStyle = CAKE[i % CAKE.length]; rrect(x, y, STEP_W, STEP_H, 9); ctx.fill();
+  // 위쪽 크림
+  ctx.fillStyle = '#fffaf5';
+  ctx.beginPath(); ctx.moveTo(x + 8, y + 1);
+  ctx.lineTo(x + STEP_W - 8, y + 1); ctx.arcTo(x + STEP_W, y + 1, x + STEP_W, y + 9, 8);
+  for (let k = 0; k < 4; k++) {
+    const cx = x + STEP_W - 9 - k * 16.5;
+    ctx.quadraticCurveTo(cx, y + 13 + (k % 2) * 3, cx - 8, y + 8);
+  }
+  ctx.arcTo(x, y + 1, x + 8, y + 1, 8); ctx.closePath(); ctx.fill();
+  if (i <= idx) { ctx.fillStyle = 'rgba(255,255,255,.35)'; rrect(x, y, STEP_W, STEP_H, 9); ctx.fill(); }
   if (i % 100 === 0 && i > 0) {
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     outlinedText(`${i}층`, x + STEP_W / 2, y + STEP_H + 14, `bold 13px ${FONT}`, '#ffd84d', 4);
