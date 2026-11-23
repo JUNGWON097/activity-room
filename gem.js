@@ -1,4 +1,4 @@
-import { initGamePage, showResult, setupCanvas, canvasPoint } from './common.js?v=53';
+import { initGamePage, showResult, setupCanvas, canvasPoint } from './common.js?v=54';
 
 initGamePage('gem');
 
