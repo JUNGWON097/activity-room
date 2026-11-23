@@ -1,4 +1,4 @@
-import { initGamePage, showResult, setupCanvas, loadBoard, IS_MOBILE, esc } from './common.js?v=52';
+import { initGamePage, showResult, setupCanvas, loadBoard, IS_MOBILE, esc } from './common.js?v=53';
 
 initGamePage('typing');
 

@@ -1,4 +1,4 @@
-import { initGamePage, showResult, setupCanvas, canvasPoint } from './common.js?v=52';
+import { initGamePage, showResult, setupCanvas, canvasPoint } from './common.js?v=53';
 
 initGamePage('num');
 
@@ -14,12 +14,35 @@ const INK = '#5b4466';
 const TINTS = ['#ffd6e4', '#ffe3c2', '#fff2b8', '#d4f5dc', '#d6ecff', '#e6dcff'];
 
 let state = 'ready';   // ready → play → over → done
-let board = [], tints = [], next = 1, startAt = 0, penalty = 0, endTime = 0, shake = 0, shakeCell = -1, pops = [], hits = {};
+let board = [], tints = [], sizes = [], next = 1, startAt = 0, penalty = 0, endTime = 0, shake = 0, shakeCell = -1, pops = [], hits = {};
 
 function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+// 색이 길잡이가 되지 않게: 이어지는 숫자끼리, 바로 옆 칸끼리, 같은 색이 오지 않게 고른다
+function makeTints() {
+  for (let tries = 0; tries < 200; tries++) {
+    const t = new Array(COUNT), at = {};
+    board.forEach((v, i) => { at[v] = i; });
+    let ok = true;
+    for (let i = 0; i < COUNT && ok; i++) {
+      const v = board[i], ban = new Set();
+      const r = Math.floor(i / N), c = i % N;
+      for (const [dr, dc] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+        const rr = r + dr, cc = c + dc;
+        if (rr >= 0 && rr < N && cc >= 0 && cc < N && t[rr * N + cc]) ban.add(t[rr * N + cc]);
+      }
+      for (const u of [v - 1, v + 1, v - 2, v + 2]) if (t[at[u]]) ban.add(t[at[u]]);
+      const pick = TINTS.filter(x => !ban.has(x));
+      if (!pick.length) { ok = false; break; }
+      t[i] = pick[Math.floor(Math.random() * pick.length)];
+    }
+    if (ok) return t;
+  }
+  return board.map((_, i) => TINTS[i % TINTS.length]);
+}
 function start() {
   board = shuffle(Array.from({ length: COUNT }, (_, i) => i + 1));
-  tints = board.map(() => TINTS[Math.floor(Math.random() * TINTS.length)]);
+  tints = makeTints();
+  sizes = board.map(() => .3 + Math.random() * .2);   // 글자 크기도 칸마다 조금씩 다르게
   next = 1; penalty = 0; shake = 0; shakeCell = -1; pops = []; hits = {};
   startAt = performance.now();
   state = 'play'; veil.hidden = true;
@@ -95,7 +118,7 @@ function draw(now) {
     if (!done) { ctx.fillStyle = 'rgba(91,68,102,.14)'; rr(x, y + 4, CELL, CELL, 14); ctx.fill(); }
     ctx.globalAlpha = done ? 1 - .7 * hk : 1;
     ctx.fillStyle = done ? '#ffffff' : tints[i]; rr(x + ox, y + ox, CELL * s, CELL * s, 14); ctx.fill();
-    ctx.font = `900 ${CELL * .42}px Pretendard, sans-serif`;
+    ctx.font = `900 ${CELL * (done ? .4 : sizes[i])}px Pretendard, sans-serif`;
     ctx.fillStyle = done ? '#c9bcd6' : INK;
     ctx.fillText(String(v), x + CELL / 2, y + CELL / 2 + 2);
     ctx.globalAlpha = 1;
