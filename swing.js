@@ -1,4 +1,4 @@
-import { initGamePage, showResult, setupCanvas } from './common.js?v=54';
+import { initGamePage, showResult, setupCanvas } from './common.js?v=55';
 
 initGamePage('swing');
 
@@ -9,14 +9,14 @@ const veil = document.getElementById('veil');
 const FONT = 'Galmuri11, Pretendard, sans-serif';
 const INK = '#120d24';
 
-const G = 1500;            // 중력
+const G = 1900;            // 중력
 const REACH = 360;         // 줄이 닿는 거리
 const REEL = 80;           // 누르고 있으면 줄을 이만큼씩 감는다
-const VMAX = 900;
+const VMAX = 1300;
 const JUMP = 560;          // 고리가 안 닿을 때 땅에서 누르면 폴짝
 const FOOT = 15;           // 다람쥐 중심에서 발끝까지
 const ACORN_M = 10;        // 도토리 하나 = 10m
-const scrollSpeed = t => Math.min(420, 150 + t * 2.6);   // 화면이 저절로 흘러가는 빠르기(점점 빨라진다)
+const scrollSpeed = t => Math.min(620, 300 + t * 4);   // 화면이 저절로 흘러가는 빠르기(점점 빨라진다)
 
 /* ---------- 다람쥐 그림 (12×11 픽셀) ---------- */
 const SQ_MAP = [
