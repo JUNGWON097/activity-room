@@ -1,4 +1,4 @@
-import { initGamePage, showResult, setupCanvas, canvasPoint } from './common.js?v=48';
+import { initGamePage, showResult, setupCanvas, canvasPoint } from './common.js?v=49';
 
 initGamePage('stairs');
 
@@ -442,20 +442,15 @@ function stepPal(i) {
   return [`hsl(${h},45%,40%)`, `hsl(${h},70%,70%)`, `hsl(${h},50%,22%)`, `hsl(${h},90%,88%)`];
 }
 function drawStep(i, x, y, now) {
-  const next = i === idx + 1;
-  const [body, top, shade, shine] = next ? ['#f0b400', '#ffd84d', '#a87800', '#fff6c8'] : stepPal(i);
+  const [body, top, shade, shine] = stepPal(i);
   x = snap(x); y = snap(y);
   px(x + 4, y + 8, STEP_W, STEP_H, 'rgba(0,0,0,.22)');
   px(x, y, STEP_W, STEP_H, body);
   px(x, y, STEP_W, 8, top);
   px(x + 4, y, STEP_W - 16, 4, shine);
   px(x, y + STEP_H - 4, STEP_W, 4, shade);
-  if (i >= 1200 && i < 2000 && !next) { px(x + 4, y + 12, 4, 4, shade); px(x + STEP_W - 8, y + 12, 4, 4, shade); }   // 리벳
+  if (i >= 1200 && i < 2000) { px(x + 4, y + 12, 4, 4, shade); px(x + STEP_W - 8, y + 12, 4, 4, shade); }   // 리벳
   if (i <= idx) { ctx.fillStyle = 'rgba(0,0,0,.18)'; ctx.fillRect(x, y, STEP_W, STEP_H); }
-  if (next) {
-    const tw = Math.floor(now / 150) % 2;
-    px(x + STEP_W - 8, y - 8 - tw * 4, 4, 4, '#fff'); px(x + 4, y - 4 - (1 - tw) * 4, 4, 4, '#fff');
-  }
   if (i % 100 === 0 && i > 0) {
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     outlinedText(`${i}층`, x + STEP_W / 2, y + STEP_H + 14, `bold 13px ${FONT}`, '#ffd84d', 4);
@@ -522,7 +517,7 @@ function draw(now) {
   ctx.textAlign = 'center'; ctx.textBaseline = 'top';
   outlinedText(idx, W / 2, 44, `bold 44px ${FONT}`, '#fff', 8);
   if (idx === 0 && state === 'play') {
-    outlinedText('반짝이는 노란 계단 쪽을 누르세요', W / 2, 104, `bold 15px ${FONT}`, '#fff', 5);
+    outlinedText('다음 계단 방향을 누르세요', W / 2, 104, `bold 15px ${FONT}`, '#fff', 5);
   }
   // 새 구역 안내
   if (banner) {
