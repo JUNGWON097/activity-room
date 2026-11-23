@@ -1,4 +1,4 @@
-import { initGamePage, showResult, setupCanvas } from './common.js?v=50';
+import { initGamePage, showResult, setupCanvas } from './common.js?v=51';
 
 initGamePage('tower');
 
