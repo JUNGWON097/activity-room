@@ -1,4 +1,4 @@
-import { initGamePage, showResult, setupCanvas } from './common.js?v=57';
+import { initGamePage, showResult, setupCanvas } from './common.js?v=58';
 
 initGamePage('swing');
 
@@ -82,7 +82,7 @@ function start() {
 }
 const dist = () => Math.max(0, Math.floor(cam / 10));
 const score = () => dist() + got * ACORN_M;
-const groundAt = x => grounds.find(g => x >= g.x0 && x <= g.x1);
+const groundAt = (x, m = 0) => grounds.find(g => x >= g.x0 - m && x <= g.x1 + m);
 
 /* ---------- 움직임 ---------- */
 function grab() {
@@ -105,8 +105,9 @@ function step(dt, run) {
   if (!holding) rope = null;
 
   if (p.onGround) {
-    // 달리기: 화면보다 조금 빠르게 달려서 천천히 앞으로 나간다
-    p.vx += (run + 50 - p.vx) * Math.min(1, dt * 6);
+    // 달리기: 화면보다 조금 빠르게 달려서 천천히 앞으로 나간다(뒤처져 있으면 더 힘껏 따라잡는다)
+    const lag = p.x - cam < W * .3 ? 170 : 50;
+    p.vx += (run + lag - p.vx) * Math.min(1, dt * 6);
     p.x += p.vx * dt;
     const g = groundAt(p.x);
     if (!g) p.onGround = false;               // 땅 끝을 지나면 떨어지기 시작
@@ -129,9 +130,9 @@ function step(dt, run) {
     const prevFoot = p.y + FOOT;
     p.x += p.vx * dt; p.y += p.vy * dt;
     // 위에서 내려와 땅에 닿으면 착지
-    const g = groundAt(p.x);
-    // 땅 끝에 살짝 걸려도 올라선다
-    if (g && p.vy > 0 && prevFoot <= g.y + 16 && p.y + FOOT >= g.y) { p.y = g.y - FOOT; p.vy = 0; p.onGround = true; }
+    // 땅 끝이나 옆면에 살짝 걸려도 올라선다
+    const g = groundAt(p.x, 14);
+    if (g && p.vy > 0 && prevFoot <= g.y + 30 && p.y + FOOT >= g.y) { p.y = g.y - FOOT; p.vy = 0; p.onGround = true; }
   }
   const sp = Math.hypot(p.vx, p.vy);
   if (sp > VMAX) { p.vx *= VMAX / sp; p.vy *= VMAX / sp; }
@@ -158,7 +159,7 @@ function update(dt, now) {
     }
   }
   if (p.y > H + 40) over(now, 'fall');
-  else if (p.x < cam - 8) over(now, 'left');
+  else if (p.x < cam - 30) over(now, 'left');
 }
 function over(now, why) {
   state = 'over'; overAt = now; overWhy = why; rope = null;
