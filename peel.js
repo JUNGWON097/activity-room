@@ -1,14 +1,19 @@
-import { initGamePage, showResult, setupCanvas, canvasPoint } from './common.js?v=59';
+import { initGamePage, showResult, setupCanvas, canvasPoint, IS_MOBILE } from './common.js?v=60';
 
 initGamePage('peel');
 
-const W = 420, H = 580;
+// 휴대폰은 세로로 긴 판(버튼 · 과일을 크게), 컴퓨터는 조금 낮은 판
+const MOB = IS_MOBILE;
+const W = 420, H = MOB ? 760 : 620;
 const TIME = 60;                          // 한 판 60초
 const cv = document.getElementById('cv');
+if (MOB) document.getElementById('stage').classList.add('tall');
 const ctx = setupCanvas(cv, W, H);
 const veil = document.getElementById('veil');
 const INK = '#5b4466';
-const FX = W / 2, FY = 236;               // 과일 자리
+const FS = MOB ? 1.15 : 1;                // 과일 크기 배율
+const FX = 246, FY = MOB ? 292 : 232;     // 과일 자리(왼쪽엔 토끼)
+const BOARD = FY + 70 * FS;               // 도마 윗면
 
 // 과일: 껍질색 · 속살색 · 크기 · 모양
 const FRUITS = [
@@ -22,16 +27,20 @@ const FRUITS = [
 // 방향: 0 위 · 1 오른쪽 · 2 아래 · 3 왼쪽
 const KEY_DIR = { ArrowUp: 0, KeyW: 0, ArrowRight: 1, KeyD: 1, ArrowDown: 2, KeyS: 2, ArrowLeft: 3, KeyA: 3 };
 const BTN_ORDER = [3, 0, 2, 1];           // 화면 버튼은 ← ↑ ↓ → 순서
-const BY = 462, BH = 88, BG = 10, BW = (W - 28 - BG * 3) / 4;
+
+// 순서판(눌러야 할 화살표를 보여 주기만 하는 판)과 누르는 버튼은 모양 · 색을 확실히 다르게 한다
+const TOK = MOB ? 50 : 40, TGAP = 8;      // 순서판 동그라미 크기
+const SY = BOARD + 70, SH = 34 + TOK * 2 + TGAP + 12;
+const BY = SY + SH + 16, BG = 10, BW = (W - 28 - BG * 3) / 4, BH = H - 16 - BY;
 
 let state = 'ready';   // ready → play → over → done
-let count = 0, miss = 0, seq = [], prog = 0, kind = 0, startAt = 0, endAt = 0;
-let enterAt = 0, shakeAt = -1e9, flies = [], pops = [], sparks = [], pressed = {};
+let count = 0, miss = 0, seq = [], prog = 0, kind = 0, endAt = 0;
+let enterAt = 0, shakeAt = -1e9, okAt = -1e9, flies = [], pops = [], sparks = [], pressed = {};
 
 const rnd = (a, b) => a + Math.random() * (b - a);
 function newFruit(now) {
   kind = count < 12 ? Math.floor(count / 2) : Math.floor(Math.random() * FRUITS.length);
-  const n = Math.min(9, 4 + Math.floor(count / 3));   // 깎을수록 화살표가 길어진다
+  const n = Math.min(12, 10 + Math.floor(count / 5));   // 화살표 10개로 시작해 깎을수록 조금씩 길어진다(최대 12개)
   seq = [];
   for (let i = 0; i < n; i++) {
     let d;
@@ -43,8 +52,8 @@ function newFruit(now) {
 }
 function start() {
   const now = performance.now();
-  count = 0; miss = 0; flies = []; pops = []; sparks = []; shakeAt = -1e9;
-  startAt = now; endAt = now + TIME * 1000;
+  count = 0; miss = 0; flies = []; pops = []; sparks = []; shakeAt = -1e9; okAt = -1e9;
+  endAt = now + TIME * 1000;
   newFruit(now);
   state = 'play'; veil.hidden = true;
 }
@@ -54,9 +63,9 @@ function press(dir, now) {
   if (dir === seq[prog]) {
     prog++;
     if (prog >= seq.length) {
-      count++;
+      count++; okAt = now;
       flies.push({ kind, t: now });
-      pops.push({ s: '+1', x: FX, y: FY - 100, t: now });
+      pops.push({ s: '+1', x: FX, y: FY - 100 * FS, t: now });
       const f = FRUITS[kind];
       for (let i = 0; i < 14; i++) { const a = Math.random() * 6.28, s = rnd(120, 260); sparks.push({ x: FX, y: FY, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 80, life: .6, c: i % 2 ? f.flesh : '#ffffff' }); }
       newFruit(now);
@@ -64,10 +73,10 @@ function press(dir, now) {
   } else {
     // 틀리면 이 과일은 처음부터
     miss++; prog = 0; shakeAt = now;
-    pops.push({ s: '처음부터!', x: FX, y: FY - 100, t: now });
+    pops.push({ s: '처음부터!', x: FX, y: FY - 100 * FS, t: now });
   }
 }
-function finish(now) {
+function finish() {
   state = 'over';
   setTimeout(() => {
     state = 'done';
@@ -99,7 +108,7 @@ function fruitPath(f, x, y, r) {
   } else ctx.arc(x, y, r, 0, Math.PI * 2);
 }
 // done: 0~1 깎인 정도
-function drawFruit(f, x, y, s, done, now) {
+function drawFruit(f, x, y, s, done) {
   const r = f.r * s;
   ctx.fillStyle = 'rgba(91,68,102,.13)'; ctx.beginPath(); ctx.ellipse(x, y + r * 1.02, r * .8, r * .16, 0, 0, Math.PI * 2); ctx.fill();
   ctx.save();
@@ -129,13 +138,75 @@ function drawFruit(f, x, y, s, done, now) {
     ctx.fillStyle = '#5fc46b'; ctx.beginPath(); ctx.ellipse(x + 18 * s, topY - 10 * s, 14 * s, 7 * s, -.5, 0, Math.PI * 2); ctx.fill();
   }
 }
-function drawPeelAndKnife(f, x, y, done, now) {
-  const r = f.r, a = -Math.PI / 2 + Math.PI * 2 * done;
+// 칼날 자리와 손잡이 자리(토끼 손이 여기를 잡는다)
+function knifeAt(f, x, y, done) {
+  const a = -Math.PI / 2 + Math.PI * 2 * done, rot = a + Math.PI / 2, r = f.r * FS;
   const ex = x + Math.cos(a) * r * .98, ey = y + Math.sin(a) * r * .98;
+  return { a, ex, ey, hx: ex - Math.cos(rot) * 20 - Math.sin(rot) * 2, hy: ey - Math.sin(rot) * 20 + Math.cos(rot) * 2 };
+}
+
+/* ---------- 토끼 ---------- */
+const BX = 78, BASE = BOARD + 24;
+const LINE = '#e3d2e6', FUR = '#ffffff', PINK = '#ffc4d6';
+function blob(fn, fill = FUR) { ctx.beginPath(); fn(); ctx.fillStyle = fill; ctx.fill(); ctx.strokeStyle = LINE; ctx.lineWidth = 3; ctx.stroke(); }
+function bunnyY(now) {
+  const last = Math.max(0, ...Object.values(pressed));
+  return Math.sin(now / 420) * 1.5 + (now - last < 90 ? 3 : 0) - (now - okAt < 260 ? 8 * Math.sin((now - okAt) / 260 * Math.PI) : 0);
+}
+function drawBunny(now) {
+  const dy = bunnyY(now), hy = BASE - 96 + dy;
+  // 귀
+  for (const [ox, tilt] of [[-12, -.18], [14, .22]]) {
+    blob(() => ctx.ellipse(BX + ox, hy - 46, 11, 30, tilt, 0, Math.PI * 2));
+    ctx.fillStyle = PINK; ctx.beginPath(); ctx.ellipse(BX + ox, hy - 44, 5, 20, tilt, 0, Math.PI * 2); ctx.fill();
+  }
+  // 몸 · 머리
+  blob(() => ctx.ellipse(BX, BASE - 34 + dy * .5, 34, 36, 0, 0, Math.PI * 2));
+  ctx.fillStyle = '#fff3f7'; ctx.beginPath(); ctx.ellipse(BX + 4, BASE - 28 + dy * .5, 20, 22, 0, 0, Math.PI * 2); ctx.fill();
+  blob(() => ctx.ellipse(BX + 2, hy, 36, 32, 0, 0, Math.PI * 2));
+  // 얼굴(과일 쪽을 본다)
+  const ex1 = BX - 4, ex2 = BX + 20, ey = hy - 2;
+  ctx.strokeStyle = INK; ctx.fillStyle = INK; ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  if (now - okAt < 380) {                       // 신남 ^ ^
+    for (const x of [ex1, ex2]) { ctx.beginPath(); ctx.moveTo(x - 5, ey + 2); ctx.lineTo(x, ey - 3); ctx.lineTo(x + 5, ey + 2); ctx.stroke(); }
+  } else if (now - shakeAt < 450) {             // 당황 > <
+    ctx.beginPath(); ctx.moveTo(ex1 - 5, ey - 4); ctx.lineTo(ex1 + 4, ey); ctx.lineTo(ex1 - 5, ey + 4); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(ex2 + 5, ey - 4); ctx.lineTo(ex2 - 4, ey); ctx.lineTo(ex2 + 5, ey + 4); ctx.stroke();
+    ctx.fillStyle = '#8fd0ff'; ctx.beginPath(); ctx.moveTo(BX + 34, hy - 26); ctx.quadraticCurveTo(BX + 40, hy - 14, BX + 34, hy - 12); ctx.quadraticCurveTo(BX + 28, hy - 14, BX + 34, hy - 26); ctx.fill();
+  } else if (now % 3200 < 130) {                // 깜빡
+    for (const x of [ex1, ex2]) { ctx.beginPath(); ctx.moveTo(x - 4, ey); ctx.lineTo(x + 4, ey); ctx.stroke(); }
+  } else {
+    for (const x of [ex1, ex2]) {
+      ctx.fillStyle = INK; ctx.beginPath(); ctx.arc(x, ey, 4.5, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(x + 1.5, ey - 1.5, 1.6, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+  ctx.fillStyle = 'rgba(255,140,170,.45)';
+  ctx.beginPath(); ctx.ellipse(ex1 - 8, ey + 11, 7, 4, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(ex2 + 8, ey + 11, 7, 4, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#ff8fab'; ctx.beginPath(); ctx.ellipse(BX + 8, ey + 7, 3.5, 2.5, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = INK; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(BX + 3, ey + 11); ctx.quadraticCurveTo(BX + 8, ey + 15, BX + 8, ey + 10); ctx.quadraticCurveTo(BX + 8, ey + 15, BX + 13, ey + 11); ctx.stroke();
+  // 안 쓰는 손 · 발
+  blob(() => ctx.ellipse(BX - 26, BASE - 36 + dy * .5, 9, 11, .4, 0, Math.PI * 2));
+  blob(() => ctx.ellipse(BX - 14, BASE - 2, 14, 8, 0, 0, Math.PI * 2));
+  blob(() => ctx.ellipse(BX + 16, BASE - 2, 14, 8, 0, 0, Math.PI * 2));
+}
+// 칼 잡은 팔: 과일 뒤로 지나가 손잡이를 잡는다
+function bunnyArm(now, hx, hy) {
+  const sx = BX + 22, sy = BASE - 46 + bunnyY(now) * .5;
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = LINE; ctx.lineWidth = 19; ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(hx, hy); ctx.stroke();
+  ctx.strokeStyle = FUR; ctx.lineWidth = 13; ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(hx, hy); ctx.stroke();
+}
+function bunnyPaw(hx, hy) { blob(() => ctx.arc(hx, hy, 9, 0, Math.PI * 2)); }
+
+function drawPeelAndKnife(f, x, y, done, now) {
+  const { a, ex, ey, hx, hy } = knifeAt(f, x, y, done);
   // 껍질이 길게 늘어진다
   if (done > 0) {
-    const len = 24 + 150 * done;
-    ctx.strokeStyle = f.peel; ctx.lineWidth = 11; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    const len = (24 + 150 * done) * FS;
+    ctx.strokeStyle = f.peel; ctx.lineWidth = 11 * FS; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
     ctx.beginPath(); ctx.moveTo(ex, ey);
     for (let i = 1; i <= 16; i++) {
       const k = i / 16;
@@ -149,6 +220,7 @@ function drawPeelAndKnife(f, x, y, done, now) {
   ctx.beginPath(); ctx.moveTo(-4, -4); ctx.lineTo(34, -4); ctx.quadraticCurveTo(42, 2, 34, 8); ctx.lineTo(-4, 8); ctx.closePath(); ctx.fill(); ctx.stroke();
   ctx.fillStyle = '#b07a4a'; rr(-36, -5, 32, 14, 6); ctx.fill();
   ctx.restore();
+  bunnyPaw(hx, hy);
 }
 function arrow(x, y, s, dir, col) {
   ctx.save(); ctx.translate(x, y); ctx.rotate(dir * Math.PI / 2);
@@ -159,16 +231,54 @@ function arrow(x, y, s, dir, col) {
 }
 function btnRect(i) { return { x: 14 + i * (BW + BG), y: BY, w: BW, h: BH }; }
 
+// 순서판: 보여 주기만 하는 판. 납작한 동그라미, 지금 누를 차례만 크게
+function drawSequence(now) {
+  ctx.fillStyle = '#f3e9fa'; rr(14, SY, W - 28, SH, 18); ctx.fill();
+  ctx.strokeStyle = '#e2d2ee'; ctx.lineWidth = 2; ctx.setLineDash([6, 5]); ctx.stroke(); ctx.setLineDash([]);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.font = '800 14px Pretendard, sans-serif'; ctx.fillStyle = INK;
+  if (state === 'ready') {
+    ctx.fillText('이 판에 나오는 순서대로', W / 2, SY + SH / 2 - 12);
+    ctx.fillText('아래 분홍 버튼(또는 방향키)을 누르세요', W / 2, SY + SH / 2 + 12);
+    return;
+  }
+  ctx.fillText(`${FRUITS[kind].name} · 이 순서대로 아래 버튼을 누르세요`, W / 2, SY + 17);
+  const n = seq.length, per = Math.ceil(n / 2), bad = now - shakeAt < 320;
+  for (let i = 0; i < n; i++) {
+    const row = i < per ? 0 : 1, col = row ? i - per : i, rowN = row ? n - per : per;
+    const cx = (W - (TOK * rowN + TGAP * (rowN - 1))) / 2 + col * (TOK + TGAP) + TOK / 2;
+    const cy = SY + 34 + row * (TOK + TGAP) + TOK / 2;
+    const cur = i === prog && state === 'play', done = i < prog;
+    const rad = TOK / 2 * (cur ? 1.08 : .92);
+    ctx.fillStyle = bad ? '#ffd9e0' : done ? '#e4d8ee' : '#ffffff';
+    ctx.beginPath(); ctx.arc(cx, cy, rad, 0, Math.PI * 2); ctx.fill();
+    if (cur) { ctx.strokeStyle = '#ff7fa0'; ctx.lineWidth = 3; ctx.stroke(); }
+    arrow(cx, cy, TOK * .27, seq[i], done ? '#c9bad8' : bad ? '#ff5c7a' : INK);
+  }
+}
+// 누르는 버튼: 진한 분홍 · 두툼하게 튀어나온 모양
+function drawButtons(now) {
+  for (let i = 0; i < 4; i++) {
+    const b = btnRect(i), dir = BTN_ORDER[i];
+    const down = now - (pressed[dir] || -1e9) < 110, d = down ? 5 : 0;
+    ctx.fillStyle = '#d95f84'; rr(b.x, b.y + 7, b.w, b.h - 7, 20); ctx.fill();
+    ctx.fillStyle = down ? '#ff9db7' : '#ff7fa0'; rr(b.x, b.y + d, b.w, b.h - 7, 20); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,.22)'; rr(b.x + 8, b.y + d + 6, b.w - 16, 10, 5); ctx.fill();
+    arrow(b.x + b.w / 2, b.y + d + (b.h - 7) / 2, Math.min(30, b.h * .26), dir, '#ffffff');
+  }
+}
+
 function draw(now) {
   const g = ctx.createLinearGradient(0, 0, 0, H);
   g.addColorStop(0, '#fff6e8'); g.addColorStop(1, '#ffeef4');
   ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
   // 도마
-  ctx.fillStyle = '#f1d3a8'; rr(60, FY + 70, W - 120, 40, 18); ctx.fill();
-  ctx.fillStyle = '#e4bf8c'; rr(60, FY + 96, W - 120, 14, 8); ctx.fill();
+  ctx.fillStyle = '#f1d3a8'; rr(20, BOARD, W - 40, 40, 18); ctx.fill();
+  ctx.fillStyle = '#e4bf8c'; rr(20, BOARD + 26, W - 40, 14, 8); ctx.fill();
+  drawBunny(now);
 
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  if (state === 'play' && now >= endAt) finish(now);
+  if (state === 'play' && now >= endAt) finish();
   const left = state === 'ready' ? TIME : state === 'play' ? Math.max(0, (endAt - now) / 1000) : 0;
   // 깎은 개수 · 남은 시간
   outlined(`${count}개`, W / 2, 44, '900 40px Pretendard, sans-serif', '#ff6f8e');
@@ -177,56 +287,34 @@ function draw(now) {
   ctx.font = '800 14px Pretendard, sans-serif'; ctx.fillStyle = INK;
   ctx.fillText(`남은 시간 ${Math.ceil(left)}초`, W / 2, 106);
 
-  // 다 깎은 과일은 위로 톡 튀어 날아간다
+  // 다 깎은 과일은 오른쪽 위로 톡 튀어 날아간다
   for (const fl of flies) {
     const k = (now - fl.t) / 450;
     ctx.globalAlpha = Math.max(0, 1 - k);
-    drawFruit(FRUITS[fl.kind], FX - k * 160, FY - Math.sin(k * Math.PI) * 90 - k * 40, 1 - k * .4, 1, now);
+    drawFruit(FRUITS[fl.kind], FX + k * 110, FY - Math.sin(k * Math.PI) * 90 - k * 40, FS * (1 - k * .4), 1);
     ctx.globalAlpha = 1;
   }
   flies = flies.filter(fl => now - fl.t < 450);
 
-  if (state !== 'ready') {
+  if (state === 'play') {
     const f = FRUITS[kind];
     const ek = Math.min(1, (now - enterAt) / 180);
     let x = FX + (1 - ek) * 200;
     if (now - shakeAt < 320) x += Math.sin((now - shakeAt) / 20) * 7 * (1 - (now - shakeAt) / 320);
-    const done = prog / seq.length;
-    drawFruit(f, x, FY, 1, done, now);
-    if (state === 'play') drawPeelAndKnife(f, x, FY, done, now);
-    ctx.font = '800 14px Pretendard, sans-serif'; ctx.fillStyle = 'rgba(91,68,102,.6)';
-    ctx.fillText(f.name, FX, FY + 132);
+    const done = prog / seq.length, k = knifeAt(f, x, FY, done);
+    bunnyArm(now, k.hx, k.hy);
+    drawFruit(f, x, FY, FS, done);
+    drawPeelAndKnife(f, x, FY, done, now);
   } else {
-    drawFruit(FRUITS[0], FX, FY, 1, 0, now);
+    const f = state === 'ready' ? FRUITS[0] : FRUITS[kind];
+    const k = knifeAt(f, FX, FY, 0);
+    bunnyArm(now, k.hx, k.hy);
+    drawFruit(f, FX, FY, FS, 0);
+    drawPeelAndKnife(f, FX, FY, 0, now);
   }
 
-  // 눌러야 할 화살표 줄
-  if (state === 'play' || state === 'over') {
-    const n = seq.length, gap = 6, bs = Math.min(52, (W - 28 - gap * (n - 1)) / n);
-    const x0 = (W - (bs * n + gap * (n - 1))) / 2, y0 = 396;
-    const bad = now - shakeAt < 320;
-    for (let i = 0; i < n; i++) {
-      const x = x0 + i * (bs + gap), cur = i === prog && state === 'play';
-      const done = i < prog;
-      ctx.fillStyle = 'rgba(91,68,102,.12)'; rr(x, y0 + 3, bs, bs, 10); ctx.fill();
-      ctx.fillStyle = bad ? '#ffd9e0' : done ? '#e9e2f0' : cur ? '#ffffff' : '#fdf8ff';
-      rr(x, y0 - (cur ? 4 : 0), bs, bs, 10); ctx.fill();
-      if (cur) { ctx.strokeStyle = '#ff8fab'; ctx.lineWidth = 3; ctx.stroke(); }
-      arrow(x + bs / 2, y0 + bs / 2 - (cur ? 4 : 0), bs * .3, seq[i], done ? '#cbbfd8' : bad ? '#ff5c7a' : INK);
-    }
-  } else {
-    ctx.font = '800 15px Pretendard, sans-serif'; ctx.fillStyle = INK;
-    ctx.fillText('나오는 화살표를 순서대로 누르면 한 개 완성!', W / 2, 418);
-  }
-
-  // 화면 버튼 (손가락 · 마우스)
-  for (let i = 0; i < 4; i++) {
-    const b = btnRect(i), dir = BTN_ORDER[i];
-    const down = now - (pressed[dir] || -1e9) < 110;
-    ctx.fillStyle = 'rgba(91,68,102,.16)'; rr(b.x, b.y + 5, b.w, b.h, 18); ctx.fill();
-    ctx.fillStyle = down ? '#ffe1ea' : '#ffffff'; rr(b.x, b.y + (down ? 4 : 0), b.w, b.h, 18); ctx.fill();
-    arrow(b.x + b.w / 2, b.y + b.h / 2 + (down ? 4 : 0), 22, dir, '#ff7fa0');
-  }
+  drawSequence(now);
+  drawButtons(now);
 
   for (const s of sparks) {
     s.x += s.vx / 60; s.y += s.vy / 60; s.vy += 12; s.life -= 1 / 60;
@@ -235,6 +323,7 @@ function draw(now) {
   }
   ctx.globalAlpha = 1;
   sparks = sparks.filter(s => s.life > 0);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   for (const p of pops) {
     const k = (now - p.t) / 700;
     ctx.globalAlpha = Math.max(0, 1 - k);
@@ -244,7 +333,7 @@ function draw(now) {
   pops = pops.filter(p => now - p.t < 700);
 
   if (state === 'over' || state === 'done') {
-    ctx.fillStyle = 'rgba(255,255,255,.85)'; rr(W / 2 - 110, FY - 34, 220, 68, 20); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,.88)'; rr(W / 2 - 110, FY - 34, 220, 68, 20); ctx.fill();
     outlined('시간 끝!', W / 2, FY, '900 38px Pretendard, sans-serif', '#4c9dff', 8);
   }
 }
@@ -258,7 +347,7 @@ cv.addEventListener('pointerdown', e => {
   const p = canvasPoint(cv, W, e);
   for (let i = 0; i < 4; i++) {
     const b = btnRect(i);
-    if (p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y - 6 && p.y <= b.y + b.h + 10) return press(BTN_ORDER[i], performance.now());
+    if (p.x >= b.x - BG / 2 && p.x <= b.x + b.w + BG / 2 && p.y >= b.y - 8 && p.y <= b.y + b.h + 10) return press(BTN_ORDER[i], performance.now());
   }
 });
 document.addEventListener('keydown', e => {
