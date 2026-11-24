@@ -1,4 +1,4 @@
-import { initGamePage, showResult, setupCanvas, canvasPoint } from './common.js?v=61';
+import { initGamePage, showResult, setupCanvas, canvasPoint } from './common.js?v=62';
 
 initGamePage('num');
 
@@ -72,9 +72,11 @@ function finish(now) {
   state = 'over';
   setTimeout(() => {
     state = 'done';
-    showResult('num', endTime, { detail: penalty ? `틀려서 ${penalty}초가 더해졌어요` : '한 번도 안 틀렸어요!', onRetry: start });
+    showResult('num', endTime, { detail: penalty ? `틀려서 ${penalty}초가 더해졌어요` : '한 번도 안 틀렸어요!', onRetry: toReady });
   }, 1000);
 }
+// 다시 하기: 바로 시작하지 않고 처음처럼 '눌러서 시작' 화면으로 돌아간다
+function toReady() { state = 'ready'; endTime = 0; pops = []; veil.hidden = false; }
 
 /* ---------- 그리기 ---------- */
 function rr(x, y, w, h, r) {
