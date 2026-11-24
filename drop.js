@@ -1,4 +1,4 @@
-import { initGamePage, showResult, setupCanvas } from './common.js?v=56';
+import { initGamePage, showResult, setupCanvas } from './common.js?v=57';
 
 initGamePage('drop');
 
