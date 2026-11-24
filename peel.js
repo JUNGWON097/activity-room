@@ -1,19 +1,27 @@
-import { initGamePage, showResult, setupCanvas, canvasPoint, IS_MOBILE } from './common.js?v=60';
+import { initGamePage, showResult, setupCanvas, canvasPoint, IS_MOBILE } from './common.js?v=61';
 
 initGamePage('peel');
 
 // 휴대폰은 세로로 긴 판(버튼 · 과일을 크게), 컴퓨터는 조금 낮은 판
 const MOB = IS_MOBILE;
-const W = 420, H = MOB ? 760 : 620;
+const W = 420;
 const TIME = 60;                          // 한 판 60초
+const ARROWS = 10;                        // 과일 하나에 화살표 10개 + 마지막 스페이스(돌리기)
+const SPACE = 4;                          // 순서 안의 '돌리기' 칸
+const INK = '#5b4466';
+const FS = MOB ? 1.15 : 1;                // 과일 크기 배율
+const FX = 246, FY = MOB ? 312 : 232;     // 과일 자리(왼쪽엔 토끼)
+const BOARD = FY + 70 * FS;               // 도마 윗면
+// 순서판: 화살표 10개 + 돌리기를 한 줄로
+const TOK = 29, TGAP = 3, SPW = 56;
+const SY = BOARD + 70, SH = 36 + TOK + 14;
+// 버튼: ← ↑ ↓ → 돌리기 를 한 줄로
+const BY = SY + SH + 16, BG = 8, SBW = 104, BW = (W - 28 - BG * 4 - SBW) / 4, BH = MOB ? 150 : 104;
+const H = BY + BH + 16;
 const cv = document.getElementById('cv');
 if (MOB) document.getElementById('stage').classList.add('tall');
 const ctx = setupCanvas(cv, W, H);
 const veil = document.getElementById('veil');
-const INK = '#5b4466';
-const FS = MOB ? 1.15 : 1;                // 과일 크기 배율
-const FX = 246, FY = MOB ? 292 : 232;     // 과일 자리(왼쪽엔 토끼)
-const BOARD = FY + 70 * FS;               // 도마 윗면
 
 // 과일: 껍질색 · 속살색 · 크기 · 모양
 const FRUITS = [
@@ -28,11 +36,6 @@ const FRUITS = [
 const KEY_DIR = { ArrowUp: 0, KeyW: 0, ArrowRight: 1, KeyD: 1, ArrowDown: 2, KeyS: 2, ArrowLeft: 3, KeyA: 3 };
 const BTN_ORDER = [3, 0, 2, 1];           // 화면 버튼은 ← ↑ ↓ → 순서
 
-// 순서판(눌러야 할 화살표를 보여 주기만 하는 판)과 누르는 버튼은 모양 · 색을 확실히 다르게 한다
-const TOK = MOB ? 50 : 40, TGAP = 8;      // 순서판 동그라미 크기
-const SY = BOARD + 70, SH = 34 + TOK * 2 + TGAP + 12;
-const BY = SY + SH + 16, BG = 10, BW = (W - 28 - BG * 3) / 4, BH = H - 16 - BY;
-
 let state = 'ready';   // ready → play → over → done
 let count = 0, miss = 0, seq = [], prog = 0, kind = 0, endAt = 0;
 let enterAt = 0, shakeAt = -1e9, okAt = -1e9, flies = [], pops = [], sparks = [], pressed = {};
@@ -40,14 +43,14 @@ let enterAt = 0, shakeAt = -1e9, okAt = -1e9, flies = [], pops = [], sparks = []
 const rnd = (a, b) => a + Math.random() * (b - a);
 function newFruit(now) {
   kind = count < 12 ? Math.floor(count / 2) : Math.floor(Math.random() * FRUITS.length);
-  const n = Math.min(12, 10 + Math.floor(count / 5));   // 화살표 10개로 시작해 깎을수록 조금씩 길어진다(최대 12개)
   seq = [];
-  for (let i = 0; i < n; i++) {
+  for (let i = 0; i < ARROWS; i++) {
     let d;
     do d = Math.floor(Math.random() * 4);
     while (i >= 2 && d === seq[i - 1] && d === seq[i - 2]);   // 같은 화살표 3번 연속은 안 나오게
     seq.push(d);
   }
+  seq.push(SPACE);                                             // 다 깎으면 스페이스바로 돌려서 완성
   prog = 0; enterAt = now;
 }
 function start() {
@@ -73,7 +76,7 @@ function press(dir, now) {
   } else {
     // 틀리면 이 과일은 처음부터
     miss++; prog = 0; shakeAt = now;
-    pops.push({ s: '처음부터!', x: FX, y: FY - 100 * FS, t: now });
+    pops.push({ s: dir === SPACE ? '아직 덜 깎았어요!' : '처음부터!', x: FX, y: FY - 100 * FS, t: now });
   }
 }
 function finish() {
@@ -229,42 +232,64 @@ function arrow(x, y, s, dir, col) {
   ctx.lineTo(-s * .32, s * .85); ctx.lineTo(-s * .32, -s * .05); ctx.lineTo(-s * .85, -s * .05); ctx.closePath(); ctx.fill();
   ctx.restore();
 }
-function btnRect(i) { return { x: 14 + i * (BW + BG), y: BY, w: BW, h: BH }; }
+// 돌리기 표시(↻)
+function spinIcon(x, y, s, col) {
+  ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = s * .28; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.arc(x, y, s, -Math.PI * .35, Math.PI * 1.25); ctx.stroke();
+  const a = -Math.PI * .35, tx = x + Math.cos(a) * s, ty = y + Math.sin(a) * s;
+  ctx.beginPath(); ctx.moveTo(tx + s * .55, ty - s * .05); ctx.lineTo(tx - s * .2, ty - s * .5); ctx.lineTo(tx - s * .05, ty + s * .45); ctx.closePath(); ctx.fill();
+}
+// 버튼 5개: ← ↑ ↓ → 돌리기(넓게)
+const BTNS = [...BTN_ORDER.map((dir, i) => ({ dir, x: 14 + i * (BW + BG), w: BW })), { dir: SPACE, x: 14 + 4 * (BW + BG), w: SBW }];
 
-// 순서판: 보여 주기만 하는 판. 납작한 동그라미, 지금 누를 차례만 크게
+// 순서판: 보여 주기만 하는 판. 화살표 10개 + 돌리기를 한 줄로, 지금 누를 차례만 크게
 function drawSequence(now) {
   ctx.fillStyle = '#f3e9fa'; rr(14, SY, W - 28, SH, 18); ctx.fill();
   ctx.strokeStyle = '#e2d2ee'; ctx.lineWidth = 2; ctx.setLineDash([6, 5]); ctx.stroke(); ctx.setLineDash([]);
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.font = '800 14px Pretendard, sans-serif'; ctx.fillStyle = INK;
   if (state === 'ready') {
-    ctx.fillText('이 판에 나오는 순서대로', W / 2, SY + SH / 2 - 12);
-    ctx.fillText('아래 분홍 버튼(또는 방향키)을 누르세요', W / 2, SY + SH / 2 + 12);
+    ctx.fillText('이 판의 화살표를 순서대로 누르고', W / 2, SY + SH / 2 - 12);
+    ctx.fillText('마지막에 스페이스바로 과일을 돌리세요', W / 2, SY + SH / 2 + 12);
     return;
   }
-  ctx.fillText(`${FRUITS[kind].name} · 이 순서대로 아래 버튼을 누르세요`, W / 2, SY + 17);
-  const n = seq.length, per = Math.ceil(n / 2), bad = now - shakeAt < 320;
+  const spinTurn = prog === ARROWS && state === 'play';
+  ctx.fillText(spinTurn ? `${FRUITS[kind].name} 다 깎았다! 스페이스바로 돌리기` : `${FRUITS[kind].name} · 이 순서대로 아래 버튼을 누르세요`, W / 2, SY + 18);
+  const n = seq.length, bad = now - shakeAt < 320;
+  const total = TOK * ARROWS + TGAP * (ARROWS - 1) + 8 + SPW;
+  let x = (W - total) / 2;
+  const cy = SY + 36 + TOK / 2;
   for (let i = 0; i < n; i++) {
-    const row = i < per ? 0 : 1, col = row ? i - per : i, rowN = row ? n - per : per;
-    const cx = (W - (TOK * rowN + TGAP * (rowN - 1))) / 2 + col * (TOK + TGAP) + TOK / 2;
-    const cy = SY + 34 + row * (TOK + TGAP) + TOK / 2;
+    const sp = seq[i] === SPACE, w = sp ? SPW : TOK;
+    if (sp) x += 8 - TGAP;
     const cur = i === prog && state === 'play', done = i < prog;
-    const rad = TOK / 2 * (cur ? 1.08 : .92);
-    ctx.fillStyle = bad ? '#ffd9e0' : done ? '#e4d8ee' : '#ffffff';
-    ctx.beginPath(); ctx.arc(cx, cy, rad, 0, Math.PI * 2); ctx.fill();
+    const grow = cur ? 1.12 + (sp ? Math.sin(now / 90) * .05 : 0) : .94;
+    const tw = w * grow, th = TOK * grow;
+    ctx.fillStyle = bad ? '#ffd9e0' : done ? '#e4d8ee' : sp ? '#fff4c9' : '#ffffff';
+    rr(x + (w - tw) / 2, cy - th / 2, tw, th, th / 2); ctx.fill();
     if (cur) { ctx.strokeStyle = '#ff7fa0'; ctx.lineWidth = 3; ctx.stroke(); }
-    arrow(cx, cy, TOK * .27, seq[i], done ? '#c9bad8' : bad ? '#ff5c7a' : INK);
+    const col = done ? '#c9bad8' : bad ? '#ff5c7a' : INK;
+    if (sp) {
+      spinIcon(x + 12, cy, 6, col);
+      ctx.font = '900 10px Pretendard, sans-serif'; ctx.fillStyle = col; ctx.textAlign = 'left';
+      ctx.fillText('SPACE', x + 20, cy + 1); ctx.textAlign = 'center';
+    } else arrow(x + w / 2, cy, TOK * .3, seq[i], col);
+    x += w + TGAP;
   }
 }
 // 누르는 버튼: 진한 분홍 · 두툼하게 튀어나온 모양
 function drawButtons(now) {
-  for (let i = 0; i < 4; i++) {
-    const b = btnRect(i), dir = BTN_ORDER[i];
-    const down = now - (pressed[dir] || -1e9) < 110, d = down ? 5 : 0;
-    ctx.fillStyle = '#d95f84'; rr(b.x, b.y + 7, b.w, b.h - 7, 20); ctx.fill();
-    ctx.fillStyle = down ? '#ff9db7' : '#ff7fa0'; rr(b.x, b.y + d, b.w, b.h - 7, 20); ctx.fill();
-    ctx.fillStyle = 'rgba(255,255,255,.22)'; rr(b.x + 8, b.y + d + 6, b.w - 16, 10, 5); ctx.fill();
-    arrow(b.x + b.w / 2, b.y + d + (b.h - 7) / 2, Math.min(30, b.h * .26), dir, '#ffffff');
+  for (const b of BTNS) {
+    const down = now - (pressed[b.dir] || -1e9) < 110, d = down ? 5 : 0, sp = b.dir === SPACE;
+    ctx.fillStyle = sp ? '#c9862e' : '#d95f84'; rr(b.x, BY + 7, b.w, BH - 7, 20); ctx.fill();
+    ctx.fillStyle = sp ? (down ? '#ffd27a' : '#ffb84d') : (down ? '#ff9db7' : '#ff7fa0'); rr(b.x, BY + d, b.w, BH - 7, 20); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,.22)'; rr(b.x + 8, BY + d + 6, b.w - 16, 10, 5); ctx.fill();
+    const mid = BY + d + (BH - 7) / 2;
+    if (sp) {
+      spinIcon(b.x + b.w / 2, mid - 10, 14, '#ffffff');
+      ctx.font = '900 15px Pretendard, sans-serif'; ctx.fillStyle = '#ffffff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(MOB ? '돌리기' : '돌리기 Space', b.x + b.w / 2, mid + 22);
+    } else arrow(b.x + b.w / 2, mid, Math.min(26, b.w * .32), b.dir, '#ffffff');
   }
 }
 
@@ -289,19 +314,22 @@ function draw(now) {
 
   // 다 깎은 과일은 오른쪽 위로 톡 튀어 날아간다
   for (const fl of flies) {
-    const k = (now - fl.t) / 450;
-    ctx.globalAlpha = Math.max(0, 1 - k);
-    drawFruit(FRUITS[fl.kind], FX + k * 110, FY - Math.sin(k * Math.PI) * 90 - k * 40, FS * (1 - k * .4), 1);
+    // 스페이스바로 돌리면 빙글 돌면서 날아간다
+    const k = (now - fl.t) / 520;
+    ctx.globalAlpha = Math.max(0, 1 - k * k);
+    ctx.save(); ctx.translate(FX + k * 110, FY - Math.sin(k * Math.PI) * 90 - k * 40); ctx.rotate(k * Math.PI * 3);
+    drawFruit(FRUITS[fl.kind], 0, 0, FS * (1 - k * .4), 1);
+    ctx.restore();
     ctx.globalAlpha = 1;
   }
-  flies = flies.filter(fl => now - fl.t < 450);
+  flies = flies.filter(fl => now - fl.t < 520);
 
   if (state === 'play') {
     const f = FRUITS[kind];
     const ek = Math.min(1, (now - enterAt) / 180);
     let x = FX + (1 - ek) * 200;
     if (now - shakeAt < 320) x += Math.sin((now - shakeAt) / 20) * 7 * (1 - (now - shakeAt) / 320);
-    const done = prog / seq.length, k = knifeAt(f, x, FY, done);
+    const done = Math.min(1, prog / ARROWS), k = knifeAt(f, x, FY, done);
     bunnyArm(now, k.hx, k.hy);
     drawFruit(f, x, FY, FS, done);
     drawPeelAndKnife(f, x, FY, done, now);
@@ -345,14 +373,18 @@ cv.addEventListener('pointerdown', e => {
   if (e.pointerType !== 'touch' && e.button !== 0) return;
   e.preventDefault();
   const p = canvasPoint(cv, W, e);
-  for (let i = 0; i < 4; i++) {
-    const b = btnRect(i);
-    if (p.x >= b.x - BG / 2 && p.x <= b.x + b.w + BG / 2 && p.y >= b.y - 8 && p.y <= b.y + b.h + 10) return press(BTN_ORDER[i], performance.now());
+  for (const b of BTNS) {
+    if (p.x >= b.x - BG / 2 && p.x <= b.x + b.w + BG / 2 && p.y >= BY - 8 && p.y <= BY + BH + 10) return press(b.dir, performance.now());
   }
 });
 document.addEventListener('keydown', e => {
   if (document.querySelector('.overlay')) return;
-  if (e.code === 'Space') { e.preventDefault(); if (state === 'ready' && !e.repeat) start(); return; }
+  if (e.code === 'Space') {
+    e.preventDefault();
+    if (e.repeat) return;
+    if (state === 'ready') start(); else press(SPACE, performance.now());
+    return;
+  }
   if (e.code in KEY_DIR) { e.preventDefault(); if (!e.repeat) press(KEY_DIR[e.code], performance.now()); }
 });
 veil.addEventListener('click', start);
