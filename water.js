@@ -1,4 +1,4 @@
-import { initGamePage, showResult, setupCanvas, canvasPoint } from './common.js?v=62';
+import { initGamePage, showResult, setupCanvas, canvasPoint } from './common.js?v=63';
 
 initGamePage('water');
 
@@ -14,6 +14,7 @@ const COLORS = ['#ff5c7a', '#ffa23a', '#ffd93d', '#4fcf7a', '#3fc6e8', '#3f6fe8'
 
 let state = 'ready';   // ready → play → over → done
 let bottles = [], start0 = [], history = [], sel = -1, level = 0, endAt = 0, limit = 60, leftAtClear = 0, pours = [], clearAt = 0, shake = { i: -1, t: 0 }, solvedFx = {};
+let pausedAt = 0;   // 0이 아니면 일시정지 중(멈춘 시각)
 
 /* ---------- 문제 만들기 · 풀 수 있는지 확인 ---------- */
 const colorsFor = lv => Math.min(COLORS.length, 3 + Math.ceil(lv / 2));
@@ -66,7 +67,7 @@ function loadLevel() {
   limit = limitFor(level); endAt = performance.now() + limit * 1000;
 }
 function start() {
-  level = 0; clearAt = 0;
+  level = 0; clearAt = 0; pausedAt = 0;
   loadLevel();
   state = 'play'; veil.hidden = true;
 }
@@ -103,6 +104,11 @@ function tapBottle(i, now) {
 }
 function undo() { if (state !== 'play' || clearAt || !history.length) return; bottles = history.pop(); sel = -1; }
 function restart() { if (state !== 'play' || clearAt) return; history = []; bottles = start0.map(b => b.slice()); sel = -1; }
+// 일시정지: 남은 시간을 멈추고 화면을 완전히 가린다
+function pause() { if (state !== 'play' || clearAt || pausedAt) return; pausedAt = performance.now(); sel = -1; }
+function resume() { if (!pausedAt) return; endAt += performance.now() - pausedAt; pausedAt = 0; }
+const PAUSE = { x: W - 62, y: 22, w: 44, h: 44 };
+const RESUME = { x: W / 2 - 90, y: H / 2 + 20, w: 180, h: 56 };
 function finish() {
   state = 'over';
   setTimeout(() => {
@@ -132,8 +138,8 @@ function draw(now) {
   g.addColorStop(0, '#eaf4ff'); g.addColorStop(1, '#f6ecff');
   ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
 
-  const left = state === 'ready' ? limitFor(0) : state !== 'play' ? 0 : clearAt ? leftAtClear : Math.max(0, endAt - now) / 1000;
-  if (state === 'play' && !clearAt && left <= 0) finish();
+  const left = state === 'ready' ? limitFor(0) : state !== 'play' ? 0 : clearAt ? leftAtClear : Math.max(0, endAt - (pausedAt || now)) / 1000;
+  if (state === 'play' && !clearAt && !pausedAt && left <= 0) finish();
 
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   outlined(state === 'ready' ? '0' : String(level), W / 2, 46, '900 44px Pretendard, sans-serif', '#3f9be8');
@@ -184,6 +190,30 @@ function draw(now) {
     ctx.globalAlpha = t; banner(); outlined('완성!', W / 2, 300, `900 ${30 + 10 * t}px Pretendard, sans-serif`, '#ff7fa0', 9); ctx.globalAlpha = 1;
   }
   if (state === 'over' || state === 'done') { banner(); outlined('시간 끝!', W / 2, 300, '900 38px Pretendard, sans-serif', '#ff7fa0', 9); }
+
+  // 일시정지 버튼(오른쪽 위)
+  if (state === 'play' && !pausedAt) {
+    const b = PAUSE;
+    ctx.globalAlpha = clearAt ? .45 : 1;
+    ctx.fillStyle = 'rgba(74,63,102,.15)'; rr(b.x, b.y + 3, b.w, b.h, 14); ctx.fill();
+    ctx.fillStyle = '#fff'; rr(b.x, b.y, b.w, b.h, 14); ctx.fill();
+    ctx.fillStyle = INK; rr(b.x + 14, b.y + 12, 6, 20, 2); ctx.fill(); rr(b.x + 24, b.y + 12, 6, 20, 2); ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+  // 일시정지 중: 병이 전혀 안 보이게 판 전체를 가린다
+  if (pausedAt) {
+    ctx.fillStyle = '#2b2440'; ctx.fillRect(0, 0, W, H);
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#fff'; rr(W / 2 - 22, H / 2 - 120, 16, 52, 4); ctx.fill(); rr(W / 2 + 6, H / 2 - 120, 16, 52, 4); ctx.fill();
+    ctx.font = '900 34px Pretendard, sans-serif'; ctx.fillText('일시정지', W / 2, H / 2 - 30);
+    ctx.font = '700 14px Pretendard, sans-serif'; ctx.fillStyle = '#c9c0e0';
+    const lt = Math.max(0, endAt - pausedAt) / 1000;
+    ctx.fillText(`${level + 1}단계 · 남은 시간 ${Math.floor(lt / 60)}:${String(Math.floor(lt % 60)).padStart(2, '0')}`, W / 2, H / 2 - 2);
+    const b = RESUME;
+    ctx.fillStyle = '#d95f84'; rr(b.x, b.y + 5, b.w, b.h, 18); ctx.fill();
+    ctx.fillStyle = '#ff7fa0'; rr(b.x, b.y, b.w, b.h, 18); ctx.fill();
+    ctx.font = '900 19px Pretendard, sans-serif'; ctx.fillStyle = '#fff'; ctx.fillText('▶ 계속하기', W / 2, b.y + b.h / 2 + 1);
+  }
 }
 // 가운데 알림 글자 뒤에 까는 반투명 판
 function banner() { ctx.fillStyle = 'rgba(255,255,255,.82)'; rr(60, 262, W - 120, 76, 22); ctx.fill(); }
@@ -221,6 +251,8 @@ cv.addEventListener('pointerdown', e => {
   if (state !== 'play') return;
   const p = canvasPoint(cv, W, e), now = performance.now();
   const inBtn = b => p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h;
+  if (pausedAt) { if (inBtn(RESUME)) resume(); return; }   // 멈춘 동안엔 계속하기만 된다
+  if (inBtn({ x: PAUSE.x - 6, y: PAUSE.y - 6, w: PAUSE.w + 12, h: PAUSE.h + 12 })) return pause();
   if (inBtn(BTN.undo)) return undo();
   if (inBtn(BTN.reset)) return restart();
   // 병 주변을 넉넉하게 눌러도 잡히게
@@ -234,6 +266,10 @@ cv.addEventListener('pointerdown', e => {
 document.addEventListener('keydown', e => {
   if (document.querySelector('.overlay')) return;
   if (e.code === 'Space' && state === 'ready') { e.preventDefault(); start(); }
+  if (e.code === 'Escape' || e.code === 'KeyP') { if (pausedAt) resume(); else pause(); return; }
+  if (pausedAt) return;
   if ((e.ctrlKey || e.metaKey) && e.code === 'KeyZ') { e.preventDefault(); undo(); }
 });
+// 다른 탭으로 가면 저절로 멈춘다
+document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
 veil.addEventListener('click', start);
