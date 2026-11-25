@@ -234,6 +234,39 @@ const TOUCH = {
   run: [['좌우로 밀기', '옆 칸으로 옮기기 · 모퉁이에서 방향 틀기'], ['위로 밀기', '점프'], ['아래로 밀기', '숙이기']],
 };
 for (const [id, keys] of Object.entries(TOUCH)) { GAMES[id].mobile = true; GAMES[id].touchKeys = keys; }
+// 첫 화면 탭: 카테고리와 게임이 추가된 때(최신순 정렬용). 새 게임을 만들면 여기에도 한 줄 넣는다
+export const CATEGORIES = [
+  { id: 'quick', name: '⚡ 순발력' },
+  { id: 'action', name: '🏃 액션' },
+  { id: 'puzzle', name: '🧩 퍼즐' },
+  { id: 'horror', name: '👻 공포' },
+];
+const SHELF = {
+  floor13: ['horror', '2026-11-25 20:17'],
+  peel: ['quick', '2026-11-24 11:34'],
+  swing: ['action', '2026-11-23 20:09'],
+  water: ['puzzle', '2026-11-23 20:06'],
+  num: ['quick', '2026-11-23 20:05'],
+  gem: ['puzzle', '2026-11-19 11:38'],
+  dodge: ['action', '2026-11-19 11:37'],
+  typing: ['quick', '2026-11-17 17:05'],
+  run: ['action', '2026-11-12 12:42'],
+  tower: ['action', '2026-11-11 15:10'],
+  hue: ['quick', '2026-11-11 15:09'],
+  horror: ['horror', '2026-11-04 18:15'],
+  snake: ['action', '2026-11-04 17:06'],
+  omok: ['puzzle', '2026-11-04 17:05'],
+  merge: ['puzzle', '2026-11-04 17:04'],
+  drop: ['puzzle', '2026-11-04 17:03'],
+  blast: ['puzzle', '2026-11-04 17:02'],
+  tug: ['quick', '2026-10-29 15:30'],
+  ticket: ['quick', '2026-10-29 15:29'],
+  stairs: ['action', '2026-10-29 15:28'],
+  roll: ['action', '2026-10-29 15:27'],
+  duel: ['quick', '2026-10-29 15:26'],
+  archery: ['action', '2026-10-29 15:25'],
+};
+for (const [id, [cat, added]] of Object.entries(SHELF)) { GAMES[id].cat = cat; GAMES[id].added = added; }
 // sub: 다른 게임 안의 모드별 랭킹이라 목록 · 카드에는 넣지 않는다
 export const GAME_IDS = Object.keys(GAMES).filter(id => !GAMES[id].sub);
 // 휴대폰 · 태블릿: 기본 입력이 손가락이거나(갤럭시 S펜처럼 펜이 있어도 기본은 손가락), 휴대기기 브라우저
