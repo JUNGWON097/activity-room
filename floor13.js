@@ -1,4 +1,4 @@
-import { initGamePage, showResult, setupCanvas, canvasPoint } from './common.js?v=66';
+import { initGamePage, showResult, setupCanvas, canvasPoint } from './common.js?v=67';
 
 initGamePage('floor13');
 
@@ -20,7 +20,9 @@ const DOORS = [
   { s: 1, z: 2.66, n: 2 }, { s: 1, z: 5.11, n: 4 }, { s: 1, z: 7.56, n: 6 }, { s: 1, z: 10.0, n: 8 },
 ];
 // 이상 현상 목록(층마다 하나 또는 없음)
-const ANOMS = ['extraDoor', 'doorNum', 'ajar', 'red', 'dark', 'figure', 'hands', 'writing', 'poster', 'sign', 'puddle', 'crawler', 'shoes', 'behind', 'knock'];
+// 모두 눈으로 찾을 수 있다(회사에서 소리 없이 해도 된다). 소리는 분위기용
+const ANOMS = ['extraDoor', 'doorNum', 'ajar', 'red', 'dark', 'figure', 'hands', 'writing', 'poster', 'sign', 'puddle', 'crawler', 'shoes',
+  'noDoor', 'redDoor', 'tallDoor', 'posterFlip', 'extColor', 'exitRed', 'carpet', 'hatch', 'tilt', 'faceWindow', 'hangLight'];
 const C = {
   wall: [190, 180, 154], wains: [112, 98, 80], base: [46, 40, 34], floor: [84, 74, 62], runner: [104, 34, 36],
   ceil: [196, 192, 180], door: [70, 82, 92], frame: [42, 46, 52], end: [172, 164, 144],
@@ -85,7 +87,6 @@ function tone(f0, f1, dur, { type = 'sine', vol = .15, at = 0, pan = 0 } = {}) {
 }
 const step = (vol = .16, at = 0) => noise(.09, { f: 360 + Math.random() * 140, vol, at });
 const thump = (vol = .3) => tone(72, 38, .22, { vol });
-function knock() { for (let i = 0; i < 3; i++) { tone(160, 70, .12, { vol: .4, at: i * .2, pan: -.5 }); noise(.05, { f: 1000, vol: .18, at: i * .2, pan: -.5 }); } }
 function whisper(pan = 0) { noise(1.3, { type: 'bandpass', f: 2700, f2: 1300, q: 7, vol: .16, pan }); noise(1, { type: 'bandpass', f: 3600, f2: 1900, q: 9, vol: .1, at: .35, pan: -pan }); }
 function creak() { tone(85, 150, 1.1, { type: 'sawtooth', vol: .05, pan: .5 }); tone(91, 140, 1.1, { type: 'sawtooth', vol: .04, pan: .5 }); }
 function scream() {
@@ -108,8 +109,9 @@ function setupFloor() {
   pz = START; dir = 1; turnT = -1; bob = 0; stepN = 0;
   const wrong = [floor + 3, 13, 4, floor > 2 ? floor - 1 : floor + 1].filter(n => n !== floor);
   fx = {
-    figZ: L - 2.4, charge: false, crawlZ: L - 1.4, behindOn: false, behindZ: 0, behindGone: false,
-    creaked: false, knockAt: 0, shakeAt: -1e9, scrapeAt: 0, beatAt: 0,
+    figZ: L - 2.4, charge: false, crawlZ: L - 1.4,
+    creaked: false, scrapeAt: 0, beatAt: 0,
+    hair: Array.from({ length: 34 }, () => ({ x: -.26 + Math.random() * .52, z: 4.35 + Math.random() * .6, len: .3 + Math.random() * .6 })),
     sign: `${wrong[Math.floor(Math.random() * wrong.length)]}F`,
     hands: Array.from({ length: 7 }, () => ({ z: 8.05 + Math.random() * 1.45, y: -.75 + Math.random() * 1.05 })),
   };
@@ -156,10 +158,7 @@ function update(now) {
     } else if (keys.ArrowUp || keys.KeyW || touchWalk !== null) {
       pz += dir * SPEED * dt; bob += dt * 9;
       const n = Math.floor(bob / Math.PI);
-      if (n !== stepN) {
-        stepN = n; step();
-        if (anom === 'behind' && fx.behindOn && dir > 0) step(.11, .27);   // 발소리가 하나 더 따라온다
-      }
+      if (n !== stepN) { stepN = n; step(); }
     }
     pz = Math.max(.5, Math.min(L - .5, pz));
     hostiles(now, dt);
@@ -179,7 +178,7 @@ function update(now) {
     if (k >= 1.8) { state = 'play'; trans = null; }
   }
 }
-// 다가오는 것들 · 소리 신호
+// 다가오는 것들
 function hostiles(now, dt) {
   let danger = 0;
   if (anom === 'figure') {
@@ -195,15 +194,6 @@ function hostiles(now, dt) {
     if (now > fx.scrapeAt) { noise(.35, { type: 'bandpass', f: 260, q: 2, vol: .12 + .2 * danger }); fx.scrapeAt = now + 650; }
     if (gap < .9) return fail(now);
   }
-  if (anom === 'behind' && !fx.behindGone) {
-    // 등 뒤에 바짝 붙어 따라온다. 뒤돌면 바로 앞에 서 있다
-    if (dir > 0 && turnT < 0 && pz > 3.2) { fx.behindOn = true; fx.behindZ = pz - 1.5; }
-    if (dir < 0 && fx.behindOn) {
-      danger = 1;
-      if (pz - fx.behindZ < .9) { fx.behindGone = true; whisper(.4); }
-    }
-  }
-  if (anom === 'knock' && Math.abs(7 - pz) < 7 && now > fx.knockAt) { knock(); fx.knockAt = now + 2400; fx.shakeAt = now; }
   if (anom === 'ajar' && !fx.creaked && Math.abs(7.56 - pz) < 5) { creak(); fx.creaked = true; }
   if (danger > 0 && now > fx.beatAt) { thump(.25 + .25 * danger); fx.beatAt = now + 700 - 380 * danger; }
 }
@@ -272,9 +262,18 @@ function drawEndWall(now) {
   poly([P(-.32, FLOOR, E), P(.32, FLOOR, E), P(.32, DTOP, E), P(-.32, DTOP, E)], rgb(fin ? [70, 110, 84] : [92, 100, 92], l));
   poly([P(-.28, -.47, E), P(.28, -.47, E), P(.28, -.42, E), P(-.28, -.42, E)], rgb([150, 150, 140], l));
   poly([P(-.12, -.04, E), P(.12, -.04, E), P(.12, .17, E), P(-.12, .17, E)], fin ? `rgba(160,255,190,${.4 + .3 * fog(d)})` : rgb([20, 22, 24], 1));
+  if (anom === 'faceWindow' && E === L) {
+    // 철문 창에 얼굴이 붙어 있다
+    const [wx0, wy0] = P(0, .06, E);
+    ctx.fillStyle = rgb([190, 182, 168], Math.max(.55, l)); ctx.beginPath(); ctx.ellipse(wx0, wy0, .085 * k, .1 * k, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = '#000';
+    for (const ex of [-.035, .035]) { ctx.beginPath(); ctx.ellipse(wx0 + ex * k, wy0 - .02 * k, .022 * k, .017 * k, 0, 0, 7); ctx.fill(); }
+    ctx.beginPath(); ctx.ellipse(wx0, wy0 + .05 * k, .018 * k, .028 * k, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = '#0b0909'; ctx.fillRect(wx0 - .1 * k, wy0 - .11 * k, .2 * k, .035 * k);
+  }
   // 초록 비상구 표시(스스로 빛난다)
   const [sx, sy] = P(0, .4, E);
-  ctx.fillStyle = `rgba(30,${fin ? 220 : 170},95,${.35 + .65 * fog(d)})`;
+  ctx.fillStyle = anom === 'exitRed' && !fin ? `rgba(200,26,30,${.35 + .65 * fog(d)})` : `rgba(30,${fin ? 220 : 170},95,${.35 + .65 * fog(d)})`;
   poly([P(-.24, .34, E), P(.24, .34, E), P(.24, .46, E), P(-.24, .46, E)], ctx.fillStyle);
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.font = `800 ${.075 * k}px Pretendard, sans-serif`; ctx.fillStyle = `rgba(235,255,240,${.4 + .6 * fog(d)})`;
@@ -305,7 +304,7 @@ function drawSurfaces(now) {
     const zm = (c[0] + c[1]) / 2, l = lit(zm, now);
     flatQ(-HW, HW, c[0], c[1], CEIL, rgb(C.ceil, l * .72));
     flatQ(-HW, HW, c[0], c[1], FLOOR, rgb(C.floor, l));
-    flatQ(-.42, .42, c[0], c[1], FLOOR + .001, rgb(C.runner, l));
+    flatQ(-.42, .42, c[0], c[1], FLOOR + .001, rgb(anom === 'carpet' ? [30, 58, 104] : C.runner, l));
     for (const s of [-1, 1]) {
       wallQ(s, c[0], c[1], RAIL, CEIL, rgb(C.wall, l * (s * dir > 0 ? .92 : 1)));
       wallQ(s, c[0], c[1], FLOOR, RAIL, rgb(C.wains, l * .85));
@@ -315,9 +314,27 @@ function drawSurfaces(now) {
   }
 }
 function drawLights(now) {
+  if (anom === 'hatch' && dep(5.0) > NEAR + .3) {
+    // 천장 점검구가 열려 있고 긴 머리카락이 늘어져 있다
+    flatQ(-.3, .3, 4.3, 5.0, CEIL - .001, '#030303');
+    ctx.strokeStyle = '#090707'; ctx.lineCap = 'round';
+    for (const h of fx.hair) {
+      if (dep(h.z) < NEAR + .1) continue;
+      const sw = Math.sin(now / 700 + h.x * 30) * .015, [x0, y0] = P(h.x, CEIL, h.z), [x1, y1] = P(h.x + sw, CEIL - h.len, h.z);
+      ctx.lineWidth = Math.max(1.5, .02 * F / dep(h.z)); ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+    }
+  }
   LIGHTS.forEach((z, i) => {
     if (dep(z) < NEAR + .4) return;
     const on = lightLv(i, now), d = dep(z);
+    if (anom === 'hangLight' && i === 2) {
+      // 형광등 한쪽이 떨어져 비스듬히 매달려 있고 깜빡인다
+      const fl = flick(now, 5) > .5, lo = -.12 + Math.sin(now / 600) * .02;
+      ctx.strokeStyle = rgb([40, 40, 40], fog(d)); ctx.lineWidth = 1.5;
+      for (const x of [-.18, .18]) { const [a1, b1] = P(x, CEIL, z + .3), [a2, b2] = P(x, lo, z + .3); ctx.beginPath(); ctx.moveTo(a1, b1); ctx.lineTo(a2, b2); ctx.stroke(); }
+      poly([P(-.2, CEIL - .01, z - .32), P(.2, CEIL - .01, z - .32), P(.2, lo, z + .3), P(-.2, lo, z + .3)], fl ? rgb([255, 250, 230], .55 + .45 * fog(d)) : rgb([60, 60, 56], fog(d)));
+      return;
+    }
     flatQ(-.2, .2, z - .32, z + .32, CEIL - .001, on > .5 ? rgb([255, 250, 230], .55 + .45 * fog(d)) : rgb([60, 60, 56], fog(d)));
     if (on > .5) {
       const [x, y] = P(0, CEIL, z), r = .9 * F / d;
@@ -335,13 +352,14 @@ function drawDoors(now) {
   const list = DOORS.slice();
   if (anom === 'extraDoor') list.push({ s: 1, z: 3.88, n: null });
   for (const dr of list) {
-    let z = dr.z;
-    if (anom === 'knock' && dr.s === -1 && dr.n === 5 && now - fx.shakeAt < 650) z += Math.sin(now / 18) * .012;
-    const z0 = z - DW / 2, z1 = z + DW / 2, l = lit(z, now);
-    wallQ(dr.s, z0 - .04, z1 + .04, FLOOR, DTOP + .04, rgb(C.frame, l));
+    if (anom === 'noDoor' && dr.s === 1 && dr.n === 4) continue;          // 문 하나가 사라짐
+    const z = dr.z, z0 = z - DW / 2, z1 = z + DW / 2, l = lit(z, now);
+    const top = anom === 'tallDoor' && dr.s === -1 && dr.n === 5 ? CEIL - .03 : DTOP;   // 천장까지 닿는 문
+    const col = anom === 'redDoor' && dr.s === -1 && dr.n === 3 ? [128, 20, 22] : C.door;   // 빨갛게 칠한 문
+    wallQ(dr.s, z0 - .04, z1 + .04, FLOOR, top + .04, rgb(C.frame, l));
     const ajar = anom === 'ajar' && dr.s === 1 && dr.n === 6;
     const gap = ajar ? .05 + .13 * Math.max(0, Math.min(1, 1 - Math.abs(7.56 - pz) / 6)) : 0;
-    wallQ(dr.s, z0 + gap, z1, FLOOR, DTOP, rgb(C.door, l));
+    wallQ(dr.s, z0 + gap, z1, FLOOR, top, rgb(col, l));
     wallQ(dr.s, z1 - .1, z1 - .05, -.22, -.14, rgb([176, 166, 136], l));               // 손잡이
     if (ajar) {
       wallQ(dr.s, z0, z0 + gap, FLOOR, DTOP, '#020202');
@@ -352,7 +370,7 @@ function drawDoors(now) {
         wallQ(dr.s, ez + .015, ez + .035, -.04, -.015, 'rgb(232,226,204)');
       }
     }
-    if (dr.n !== null) plate(dr.s, z - .1, z + .1, .07, .15, (w, h) => {
+    if (dr.n !== null && top === DTOP) plate(dr.s, z - .1, z + .1, .07, .15, (w, h) => {
       ctx.fillStyle = rgb([206, 196, 160], l); ctx.fillRect(0, 0, w, h);
       ctx.fillStyle = rgb([30, 26, 22], Math.max(.25, l)); ctx.font = '800 6px Pretendard, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText(doorText(dr), w / 2, h / 2 + .4);
@@ -366,6 +384,7 @@ function drawWallStuff(now) {
   plate(-1, 5.48, 6.08, -.15, .3, (w, h, flip) => {
     ctx.fillStyle = rgb([222, 218, 206], pl); ctx.fillRect(0, 0, w, h);
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    if (anom === 'posterFlip') { ctx.translate(w, h); ctx.rotate(Math.PI); }   // 거꾸로 붙은 안내문
     if (anom === 'poster') {
       // 얼굴이 나를 따라 본다
       const near0 = Math.abs(5.48 - pz) < Math.abs(6.08 - pz);
@@ -389,10 +408,11 @@ function drawWallStuff(now) {
   // 소화기함(오른쪽 벽)
   const el = lit(6.34, now);
   plate(1, 6.14, 6.54, -.5, -.08, (w, h) => {
-    ctx.fillStyle = rgb([168, 28, 28], el); ctx.fillRect(0, 0, w, h);
+    const blue = anom === 'extColor';                                     // 파란 소화기함
+    ctx.fillStyle = rgb(blue ? [34, 66, 150] : [168, 28, 28], el); ctx.fillRect(0, 0, w, h);
     ctx.fillStyle = rgb([230, 220, 210], el); ctx.font = '800 7px Pretendard, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText('소화기', w / 2, h * .25);
-    ctx.fillStyle = rgb([90, 14, 14], el); ctx.fillRect(w * .25, h * .42, w * .5, h * .5);
+    ctx.fillStyle = rgb(blue ? [16, 30, 80] : [90, 14, 14], el); ctx.fillRect(w * .25, h * .42, w * .5, h * .5);
   });
   if (anom === 'hands') {
     for (const hd of fx.hands) {
@@ -449,7 +469,6 @@ function drawBillboards(now) {
   const list = [];
   if (anom === 'figure') list.push([0, fx.figZ, false]);
   if (anom === 'crawler') list.push([0, fx.crawlZ, true]);
-  if (anom === 'behind' && fx.behindOn && !fx.behindGone) list.push([.05, fx.behindZ, false]);
   list.sort((a, b) => dep(b[1]) - dep(a[1]));
   for (const [x, z, flip] of list) drawFigure(x, z, now, flip);
 }
@@ -506,7 +525,12 @@ function draw(now) {
   CY = CY0 + (walking ? Math.sin(bob) * 3.2 : 0);
   CX = CX0 + (walking ? Math.sin(bob / 2) * 2 : 0);
   if (turnT >= 0) CX += (turnT < .5 ? turnT : turnT - 1) * 2 * 620;
-  drawScene(now);
+  if (anom === 'tilt' && state !== 'ready') {
+    // 복도 전체가 비스듬히 기울어 있다
+    ctx.fillStyle = '#000'; ctx.fillRect(0, 0, VW, VH);
+    ctx.save(); ctx.translate(VW / 2, VH / 2); ctx.rotate(.09); ctx.scale(1.14, 1.14); ctx.translate(-VW / 2, -VH / 2);
+    drawScene(now); ctx.restore();
+  } else drawScene(now);
   if (turnT >= 0) { ctx.fillStyle = `rgba(0,0,0,${Math.sin(turnT * Math.PI) * .92})`; ctx.fillRect(0, 0, VW, VH); }
 
   if (state === 'ready') { ctx.fillStyle = 'rgba(0,0,0,.45)'; ctx.fillRect(0, 0, VW, VH); return; }
